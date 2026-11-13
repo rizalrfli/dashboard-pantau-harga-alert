@@ -2,7 +2,7 @@
 <html lang="id" data-type="software">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Masuk — Screener AI</title>
 <meta name="description" content="Masuk ke dashboard Pantau Saham IDX.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -46,6 +46,11 @@
   .hash-out{width:100%;font-size:13px;word-break:break-all;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px;margin-top:12px}
   .note{font-size:13px;color:var(--muted);margin-top:12px}
   footer{color:var(--muted);font-size:13px;margin-top:24px;text-align:center}
+  @media(max-width:480px){
+    body{padding:12px;padding-bottom:calc(12px + env(safe-area-inset-bottom))}
+    .login-card{padding:24px 20px}
+    input,button{font-size:16px}
+  }
 </style>
 </head>
 <body>

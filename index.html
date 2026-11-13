@@ -2,7 +2,7 @@
 <html lang="id" data-type="software">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Screener AI — Pantau Saham IDX</title>
 <meta name="page-type" content="software">
 <meta name="site-kind" content="software">
@@ -48,6 +48,12 @@
   .side-btn.active{background:var(--action);color:#fff}
   .side-btn:hover:not(.active){background:var(--surface)}
   .side-foot{margin-top:auto;font-size:13px;color:var(--muted);padding:10px;line-height:1.6}
+  .menu-btn{display:none;width:44px;height:44px;min-height:44px;padding:10px;flex-direction:column;align-items:center;justify-content:center;gap:5px;background:transparent;border:1px solid var(--line-strong);border-radius:var(--r-md);flex-shrink:0}
+  .menu-btn span{display:block;width:20px;height:2px;background:var(--text);border-radius:2px;transition:transform .18s ease,opacity .18s ease}
+  body.menu-open .menu-btn span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+  body.menu-open .menu-btn span:nth-child(2){opacity:0}
+  body.menu-open .menu-btn span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+  .menu-note{display:none}
   /* ---- Area utama ---- */
   .main{flex:1;min-width:0}
   .topbar{position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--line);z-index:5}
@@ -105,7 +111,7 @@
   .chip:hover{border-color:var(--action);color:var(--action)}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);padding:var(--s-4);margin-top:var(--s-3);box-shadow:var(--shadow)}
   .hidden{display:none!important}
-  canvas{width:100%;height:220px;background:#fff;border:1px solid var(--line);border-radius:var(--r-md)}
+  canvas{display:block;width:100%;max-width:100%;height:220px;background:#fff;border:1px solid var(--line);border-radius:var(--r-md)}
   .stat{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px}
   @media(min-width:760px){.stat{grid-template-columns:repeat(4,1fr)}}
   .stat div{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);padding:8px}
@@ -121,6 +127,12 @@
   .err{background:var(--panel);border:1px solid var(--red);color:var(--red);padding:10px;border-radius:var(--r-md);margin:10px 0}
   form.inline{display:flex;gap:8px;flex-wrap:wrap;align-items:end}
   form.inline label{font-size:13px;color:var(--muted);display:block}
+  .range-row{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+  #addCode{width:110px}
+  #alCode,#pfCode{width:100px}
+  #alValue{width:120px}
+  #pfLot{width:90px}
+  #pfPrice{width:130px}
   .del{background:none;border:none;color:var(--red);padding:2px 6px;min-height:32px}
   /* ---- Analisa AI ---- */
   .badge{display:inline-block;border-radius:999px;padding:2px 9px;font-size:13px;font-weight:600;white-space:nowrap}
@@ -142,15 +154,59 @@
   .ai-summary{margin-top:var(--s-3)}
   @media(max-width:860px){
     .app{flex-direction:column}
-    .sidebar{width:100%;height:auto;position:static;padding:10px 12px}
-    .side-nav{flex-direction:row;overflow-x:auto;gap:6px}
-    .side-btn{width:auto;white-space:nowrap}
+    /* Header mobile: logo + hamburger, menempel di atas */
+    .sidebar{width:100%;height:auto;position:sticky;top:0;z-index:30;flex-direction:row;align-items:center;justify-content:space-between;gap:8px;padding:calc(10px + env(safe-area-inset-top)) 12px 10px;border-right:none;border-bottom:1px solid var(--line)}
+    .logo{border-bottom:none;padding:0;margin:0;flex:1;min-width:0}
+    .side-label{display:none}
     .side-foot{display:none}
-    .logo{border-bottom:none;padding-bottom:4px}
+    .menu-btn{display:flex}
+    /* Panel menu: menutup sisa layar di bawah header */
+    .side-nav{position:fixed;top:calc(58px + env(safe-area-inset-top));left:0;right:0;bottom:0;z-index:25;background:var(--panel);flex-direction:column;gap:4px;padding:16px 12px calc(16px + env(safe-area-inset-bottom));overflow-y:auto;visibility:hidden;opacity:0;transform:translateY(-8px);transition:opacity .18s ease,transform .18s ease,visibility .18s}
+    body.menu-open .side-nav{visibility:visible;opacity:1;transform:none}
+    body.menu-open{overflow:hidden}
+    .side-nav .side-btn{width:100%;font-size:17px;padding:14px 12px;min-height:48px}
+    .menu-note{display:block;font-size:13px;color:var(--muted);line-height:1.6;padding:12px;border-top:1px solid var(--line);margin-top:8px}
+    /* Topbar jadi baris biasa (tidak menempel ganda): hanya cari + refresh */
+    .topbar{position:static}
+    .topbar-inner{flex-wrap:wrap;padding:12px 16px}
+    .search-wrap{flex:1;min-width:0}
+    #topSearch{font-size:16px}
+    .user-chip{display:none}
+    #btnLogout{display:none}
+    .wrap{padding-left:16px;padding-right:16px}
+    h1{font-size:24px}
+    .sum-value{font-size:24px}
     .summary{grid-template-columns:1fr}
-    .user-chip div{display:none}
-    button,input,select{min-height:44px}
-    .tabs button{flex:1}
+    button,input,select{font-size:16px;min-height:44px}
+    .tabs button{flex:1;padding:9px 4px;font-size:14px}
+    .toolbar button{flex:1 1 auto}
+    .row{flex-wrap:wrap;row-gap:6px}
+    .chip{min-height:44px;padding:8px 12px}
+    .del{min-height:44px;min-width:44px;padding:6px 10px}
+    .stat{grid-template-columns:repeat(2,1fr)}
+    canvas{height:200px}
+    .range-row button{flex:1 1 30%}
+    .search-drop button{font-size:14px}
+    form.inline>div{flex:1 1 140px}
+    form.inline input,form.inline select{width:100%}
+    #addCode,#alCode,#alValue,#pfCode,#pfLot,#pfPrice{width:100%}
+    /* Tabel: geser horizontal + kolom pertama menempel */
+    .tablewrap{position:relative}
+    .tablewrap::before{content:"Geser tabel ke samping untuk melihat semua kolom";display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+    .tablewrap th:first-child,.tablewrap td:first-child{position:sticky;left:0;background:var(--panel);box-shadow:1px 0 0 var(--line)}
+    .tablewrap thead th:first-child{background:var(--panel)}
+    footer{padding-bottom:env(safe-area-inset-bottom)}
+  }
+  @media(max-width:480px){
+    h1{font-size:22px}
+    .wrap{padding-left:12px;padding-right:12px}
+    .topbar-inner{padding:12px}
+    .toolbar button{flex:1 1 100%}
+    form.inline>div{flex:1 1 100%}
+    form.inline button{flex:1 1 100%}
+    .tabs button{font-size:13px}
+    .ai-plan td:first-child{width:88px}
+    .summary{gap:12px}
   }
 </style>
 </head>
@@ -159,12 +215,15 @@
 <div class="app">
   <aside class="sidebar">
     <div class="logo"><span class="logo-mark">S</span><div><b>Screener AI</b><span>Pantau Saham IDX</span></div></div>
+    <button class="menu-btn" id="menuBtn" type="button" aria-expanded="false" aria-controls="siteNav" aria-label="Buka menu"><span></span><span></span><span></span></button>
     <div class="side-label">Menu</div>
-    <nav class="side-nav">
+    <nav class="side-nav" id="siteNav" aria-label="Menu utama">
       <a class="side-btn active" href="index.html">Watchlist</a>
       <a class="side-btn" href="analisa.html">Analisa AI</a>
       <button class="side-btn" data-tab="alerts">Alert <span id="alertCountSide"></span></button>
       <button class="side-btn" data-tab="port">Portofolio</button>
+      <button class="side-btn" type="button" onclick="logout()">Logout</button>
+      <div class="menu-note">Data Yahoo Finance &bull; Bisa delay ~15 menit<br>Bukan rekomendasi investasi</div>
     </nav>
     <div class="side-foot">Data Yahoo Finance<br>Bisa delay ~15 menit<br>Bukan rekomendasi investasi</div>
   </aside>
@@ -206,7 +265,7 @@
       <!-- WATCHLIST -->
       <section id="tab-watch">
         <form class="inline" id="addForm">
-          <div><label>Kode saham</label><input id="addCode" placeholder="BBCA" maxlength="6" style="text-transform:uppercase;width:110px"></div>
+          <div><label>Kode saham</label><input id="addCode" placeholder="BBCA" maxlength="6" style="text-transform:uppercase"></div>
           <button type="submit" class="primary">Tambah saham</button>
         </form>
         <p class="sub">Populer: <span id="chips"></span></p>
@@ -216,7 +275,7 @@
 
         <div id="detail" class="panel hidden">
           <div class="row"><h2 id="detailTitle" style="margin:0;font-size:18px">Detail</h2><button id="detailClose" aria-label="Tutup detail">Tutup</button></div>
-          <div style="margin:10px 0">
+          <div class="range-row">
             <button data-range="1mo">1 bln</button>
             <button data-range="3mo" class="primary">3 bln</button>
             <button data-range="6mo">6 bln</button>
@@ -233,9 +292,9 @@
         <div class="panel">
           <h2 style="margin-top:0">Buat alert</h2>
           <form class="inline" id="alertForm">
-            <div><label>Kode</label><input id="alCode" placeholder="BBCA" maxlength="6" style="text-transform:uppercase;width:100px"></div>
+            <div><label>Kode</label><input id="alCode" placeholder="BBCA" maxlength="6" style="text-transform:uppercase"></div>
             <div><label>Jenis</label><select id="alType"><option value="above">Harga ≥ (di atas)</option><option value="below">Harga ≤ (di bawah)</option><option value="pct_up">Naik ≥ % harian</option><option value="pct_down">Turun ≥ % harian</option></select></div>
-            <div><label>Nilai (Rp / %)</label><input id="alValue" type="number" step="any" placeholder="5500" style="width:120px"></div>
+            <div><label>Nilai (Rp / %)</label><input id="alValue" type="number" step="any" placeholder="5500" ></div>
             <button type="submit" class="primary">Simpan alert</button>
           </form>
         </div>
@@ -250,15 +309,15 @@
         <div class="panel">
           <h2 style="margin-top:0">Tambah posisi (manual)</h2>
           <form class="inline" id="portForm">
-            <div><label>Kode</label><input id="pfCode" placeholder="BBCA" maxlength="6" style="text-transform:uppercase;width:100px"></div>
-            <div><label>Lot (1 lot = 100 lbr)</label><input id="pfLot" type="number" min="1" step="1" placeholder="10" style="width:90px"></div>
-            <div><label>Harga beli / lembar (Rp)</label><input id="pfPrice" type="number" min="1" step="any" placeholder="4900" style="width:130px"></div>
+            <div><label>Kode</label><input id="pfCode" placeholder="BBCA" maxlength="6" style="text-transform:uppercase"></div>
+            <div><label>Lot (1 lot = 100 lbr)</label><input id="pfLot" type="number" min="1" step="1" placeholder="10" ></div>
+            <div><label>Harga beli / lembar (Rp)</label><input id="pfPrice" type="number" min="1" step="any" placeholder="4900" ></div>
             <button type="submit" class="primary">Simpan posisi</button>
           </form>
         </div>
         <div class="panel" style="margin-top:12px">
           <div class="row"><b>Total nilai &amp; P/L</b><b id="portTotal">—</b></div>
-          <div style="overflow-x:auto"><table>
+          <div class="tablewrap"><table>
             <thead><tr><th>Kode</th><th>Lot</th><th>Beli</th><th>Terakhir</th><th>P/L</th><th></th></tr></thead>
             <tbody id="portBody"></tbody>
           </table></div>
@@ -452,8 +511,16 @@ function renderAiPanel(code, a){
     <p class="mini">Analisa rule-based (MA20/MA50, RSI, MACD, support/resistance) dari data Yahoo Finance — bukan rekomendasi investasi dan bukan prediksi pasti.</p>`;
 }
 let analysis = {}; // kode -> hasil analyzeStock (dari Analisa Semua / detail)
+let lastCloses = null; // closes terakhir, untuk menggambar ulang grafik saat lebar layar berubah
 function drawChart(canvas, closes){
-  const ctx=canvas.getContext("2d"); const W=canvas.width, H=canvas.height;
+  // Ukuran bitmap mengikuti lebar kartu x devicePixelRatio (tajam di HP retina),
+  // gambar digambar ulang dalam satuan CSS px.
+  const dpr=window.devicePixelRatio||1;
+  const cssW=canvas.clientWidth||900, cssH=canvas.clientHeight||220;
+  canvas.width=Math.round(cssW*dpr); canvas.height=Math.round(cssH*dpr);
+  const ctx=canvas.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  const W=cssW, H=cssH;
   ctx.clearRect(0,0,W,H);
   const vals=closes.filter(v=>v!=null); if(vals.length<2){ ctx.fillStyle="#64748b"; ctx.font="16px sans-serif"; ctx.fillText("Data grafik belum tersedia",20,40); return; }
   const min=Math.min(...vals), max=Math.max(...vals), pad=(max-min)*0.08||1;
@@ -484,6 +551,7 @@ async function openDetail(code, keep=false){
     if(!r.ok) throw new Error("HTTP "+r.status);
     const d=await r.json();
     const closes=d.closes||[];
+    lastCloses=closes;
     drawChart($("#chart"), closes);
     const valid=closes.filter(v=>v!=null);
     const ma20=sma(closes,20), ma50=sma(closes,50);
@@ -592,7 +660,29 @@ $("#portForm").addEventListener("submit", e=>{
   renderPortfolio();
 });
 
+// Gambar ulang grafik saat lebar layar berubah (rotasi HP / resize), debounce 150ms
+let chartResizeT=null;
+window.addEventListener("resize",()=>{
+  clearTimeout(chartResizeT);
+  chartResizeT=setTimeout(()=>{
+    if(selected && lastCloses && !$("#detail").classList.contains("hidden")) drawChart($("#chart"), lastCloses);
+  },150);
+});
+
 renderAlerts(); renderPortfolio();
+// ---- Menu mobile (hamburger) ----
+const menuBtn=$("#menuBtn");
+function closeMenu(){document.body.classList.remove("menu-open");menuBtn.setAttribute("aria-expanded","false");menuBtn.setAttribute("aria-label","Buka menu");}
+menuBtn.addEventListener("click",()=>{
+  const open=document.body.classList.toggle("menu-open");
+  menuBtn.setAttribute("aria-expanded",String(open));
+  menuBtn.setAttribute("aria-label",open?"Tutup menu":"Buka menu");
+  if(open){const first=document.querySelector("#siteNav a, #siteNav button"); if(first) first.focus();}
+  else menuBtn.focus();
+});
+document.querySelectorAll("#siteNav a, #siteNav button").forEach(el=>el.addEventListener("click",()=>{closeMenu();}));
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeMenu();});
+
 if(location.hash==="#alerts") showTab("alerts");
 else if(location.hash==="#port") showTab("port");
 refreshAll();
