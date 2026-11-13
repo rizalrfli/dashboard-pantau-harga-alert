@@ -1,0 +1,14 @@
+---
+// src/components/StockLogo.astro — logo saham untuk pemakaian statis
+// (server-rendered). Konten yang dirender JavaScript memakai helper yang
+// sama dari src/lib/logos.js (stockLogoHTML) — satu sumber markup.
+import { stockLogoHTML } from "../lib/logos.js";
+
+interface Props {
+  code: string;
+  size?: number;
+}
+
+const { code, size = 36 } = Astro.props;
+---
+<Fragment set:html={stockLogoHTML(code, size)} />

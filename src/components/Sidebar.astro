@@ -1,0 +1,55 @@
+---
+// src/components/Sidebar.astro — menu kiri (desktop) / header + hamburger (HP).
+// Di halaman Watchlist, Alert & Portofolio adalah tombol tab (data-tab);
+// di halaman lain keduanya link ke index.html#alerts / #port.
+interface Props {
+  active: "watch" | "analisa" | "whale";
+  onIndex?: boolean;
+}
+
+const { active, onIndex = false } = Astro.props;
+const cls = (n: string) => "side-btn" + (active === n ? " active" : "");
+---
+<aside class="sidebar">
+  <div class="logo">
+    <span class="logo-mark">S</span><div><b>Screener AI</b><span>Pantau Saham IDX</span></div>
+  </div>
+  <button
+    class="menu-btn"
+    id="menuBtn"
+    type="button"
+    aria-expanded="false"
+    aria-controls="siteNav"
+    aria-label="Buka menu"
+  >
+    <span></span><span></span><span></span>
+  </button>
+  <div class="side-label">Menu</div>
+  <nav class="side-nav" id="siteNav" aria-label="Menu utama">
+    <a class={cls("watch")} href="index.html">Watchlist</a>
+    <a class={cls("analisa")} href="analisa.html">Analisa AI</a>
+    <a class={cls("whale")} href="whale.html">Whale Detector</a>
+    {
+      onIndex ? (
+        <>
+          <button class="side-btn" data-tab="alerts">
+            Alert <span id="alertCountSide"></span>
+          </button>
+          <button class="side-btn" data-tab="port">Portofolio</button>
+        </>
+      ) : (
+        <>
+          <a class="side-btn" href="index.html#alerts">Alert</a>
+          <a class="side-btn" href="index.html#port">Portofolio</a>
+        </>
+      )
+    }
+    <button class="side-btn" type="button" data-logout>Logout</button>
+    <div class="menu-note">
+      Data Yahoo Finance &bull; Bisa delay ~15 menit<br />Bukan rekomendasi investasi
+    </div>
+  </nav>
+  <div class="side-foot">
+    Data Yahoo Finance<br />Bisa delay ~15 menit<br />Bukan rekomendasi investasi
+  </div>
+</aside>

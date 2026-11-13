@@ -1,0 +1,300 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout
+  title="Whale Detector — Screener AI"
+  description="Whale Detector: lacak jejak big money / akumulasi di semua 911 saham IDX dari volume dan harga publik Yahoo Finance."
+  active="whale"
+  showRefresh={false}
+>
+
+      <div class="page-head">
+        <h1>Whale Detector</h1>
+        <div class="sub">Jejak big money di <b>semua 911 saham IDX</b> — bukan cuma watchlist. Volume hari ini vs rata-rata 20 hari, searah harga: naik + volume besar = akumulasi, turun + volume besar = distribusi.</div>
+        <div id="lastUpdate" class="sub"></div>
+      </div>
+      <div id="globalError" class="err hidden"></div>
+
+      <section class="summary">
+        <div class="sum-card">
+          <div class="sum-label">Terindikasi akumulasi</div>
+          <div class="sum-value" id="sumAccum">—</div>
+          <div class="sum-sub" id="sumAccumSub">Belum dipindai</div>
+        </div>
+        <div class="sum-card">
+          <div class="sum-label">Terindikasi distribusi</div>
+          <div class="sum-value" id="sumDist">—</div>
+          <div class="sum-sub" id="sumDistSub">Belum dipindai</div>
+        </div>
+        <div class="sum-card">
+          <div class="sum-label">Saham dipindai</div>
+          <div class="sum-value" id="sumScanned">—</div>
+          <div class="sum-sub" id="sumScannedSub">dari 911 saham IDX</div>
+        </div>
+      </section>
+
+      <div class="toolbar">
+        <button id="btnScan" class="primary">Mulai Pindai Semua Saham</button>
+        <button id="btnStop" disabled>Stop</button>
+        <button id="btnRescan">Pindai Ulang</button>
+      </div>
+      <div id="scanProgress" class="panel hidden">
+        <div class="row"><b id="scanStatus">Memindai…</b><span class="muted" id="scanEta"></span></div>
+        <div class="progress"><i id="scanBar" style="width:0%"></i></div>
+        <div class="mini" id="scanDetail"></div>
+      </div>
+      <div class="panel" style="margin-top:12px">
+        <h3 style="margin-bottom:8px">Filter hasil</h3>
+        <form class="inline" id="filterForm">
+          <div><label for="fSignal">Sinyal</label><select id="fSignal"><option value="ALL">Semua</option><option value="AKUMULASI" selected>Akumulasi saja</option><option value="DISTRIBUSI">Distribusi saja</option><option value="NETRAL">Netral saja</option></select></div>
+          <div><label for="fRatio">Min. volume ratio</label><select id="fRatio"><option value="0">Semua</option><option value="1.5" selected>≥ 1,5x</option><option value="2">≥ 2x</option><option value="3">≥ 3x</option></select></div>
+          <div><label for="fTurn">Min. turnover</label><select id="fTurn"><option value="0">Semua</option><option value="5000000000">≥ Rp5 M</option><option value="20000000000" selected>≥ Rp20 M</option><option value="50000000000">≥ Rp50 M</option></select></div>
+          <div><label for="fSearch">Cari kode / nama</label><input id="fSearch" placeholder="cth: BBCA" autocomplete="off"></div>
+        </form>
+        <div class="mini" id="scanMeta" style="margin-top:8px">Belum ada hasil pindai.</div>
+      </div>
+      <div id="whaleResults" class="panel ai-summary">
+        <b>Belum dipindai</b>
+        <p class="muted">Tekan "Mulai Pindai Semua Saham" — detector memindai 911 saham IDX satu per satu dalam batch kecil, hasilnya muncul bertahap dari skor tertinggi. Pindai penuh memakan waktu beberapa menit karena Yahoo membatasi kecepatan; hasilnya disimpan untuk hari ini, jadi kunjungan berikutnya langsung tampil tanpa pindai ulang.</p>
+        <p class="muted"><b>Yang bisa dilihat detector ini:</b> volume hari ini yang jauh di atas rata-rata 20 hari, searah dengan naik/turunnya harga, dan nilai transaksi (turnover). <b>Yang tidak bisa dilihat:</b> siapa yang beli/jual, order book, dan aliran dana asing yang sebenarnya — itu data berbayar/broker. Volume besar juga bisa berasal dari aksi korporasi atau rebalancing indeks, bukan akumulasi.</p>
+      </div>
+      <div id="aiPanel" class="ai-panel hidden"></div>
+
+      <footer>Data dari Yahoo Finance, bisa delay ~15 menit. Bukan rekomendasi investasi — selalu cek lagi sebelum membeli atau menjual saham.</footer>
+    
+</BaseLayout>
+
+<script>
+import { fmtRp, fmtPct, analyzeStock, suggestionBadge } from "../lib/ai.js";
+import { IDX_TICKERS } from "../lib/tickers.js";
+import { analyzeWhale, whaleFmtVol, whaleFmtTurn, whaleSignalBadge } from "../lib/whale.js";
+import { stockLogoHTML } from "../lib/logos.js";
+
+// ---- Whale Detector: pemindai client-side semua 911 saham IDX ----
+// Desain pindai: batch kecil (5 paralel), jeda antar batch, hasil muncul
+// bertahap, Stop kapan saja, hasil disimpan per hari perdagangan.
+// Satu ticker yang gagal (tidak ada data / rate limit) dilewati dan
+// dihitung sebagai "terlewat" — tidak pernah menghentikan pindai.
+const $ = s => document.querySelector(s);
+const BATCH_SIZE = 5;          // paralel per batch — kecil supaya Yahoo tidak rate-limit
+const BATCH_DELAY_MS = 150;    // jeda antar batch
+const RETRY_DELAY_MS = 700;    // jeda sebelum retry satu chunk yang gagal
+const CACHE_KEY = "screener_whale_v1";
+const TICKER_NAME = {};
+IDX_TICKERS.forEach(t => { TICKER_NAME[t.code] = t.name; });
+
+let results = [];              // hasil analisa whale per kode
+let skipped = [];              // kode yang gagal dipindai
+let scanning = false, stopRequested = false;
+let scanStartedAt = null, scannedCount = 0;
+
+function todayKey(){
+  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }); // YYYY-MM-DD WIB
+}
+function loadCache(){
+  try{
+    const c = JSON.parse(localStorage.getItem(CACHE_KEY));
+    if(c && c.date === todayKey() && Array.isArray(c.results)) return c;
+  }catch(e){}
+  return null;
+}
+function saveCache(){
+  try{
+    localStorage.setItem(CACHE_KEY, JSON.stringify({
+      date: todayKey(), scannedAt: new Date().toISOString(),
+      results, skipped, total: IDX_TICKERS.length
+    }));
+  }catch(e){ /* localStorage penuh: hasil tetap tampil, cuma tidak tersimpan */ }
+}
+function fmtClock(d){ return d.toLocaleTimeString("id-ID", { timeZone: "Asia/Jakarta", hour: "2-digit", minute: "2-digit" }); }
+
+async function fetchChart(code){
+  const url = `/api/chart?symbol=${encodeURIComponent(code + ".JK")}&range=1mo`;
+  const r = await fetch(url);
+  if(!r.ok) throw new Error("HTTP " + r.status);
+  return r.json();
+}
+async function fetchChartRetry(code){
+  try { return await fetchChart(code); }
+  catch(e){
+    await new Promise(res => setTimeout(res, RETRY_DELAY_MS));
+    return fetchChart(code); // retry sekali; bila masih gagal, caller mencatat skipped
+  }
+}
+
+function applyFilters(list){
+  const sig = $("#fSignal").value;
+  const minRatio = parseFloat($("#fRatio").value) || 0;
+  const minTurn = parseFloat($("#fTurn").value) || 0;
+  const term = ($("#fSearch").value || "").trim().toUpperCase();
+  return list.filter(w => {
+    if(sig !== "ALL" && w.signal !== sig) return false;
+    if((w.volumeRatio || 0) < minRatio) return false;
+    if((w.turnover || 0) < minTurn) return false;
+    if(term && !(w.code.includes(term) || (TICKER_NAME[w.code] || "").toUpperCase().includes(term))) return false;
+    return true;
+  });
+}
+
+function renderResults(){
+  const el = $("#whaleResults");
+  const filtered = applyFilters(results);
+  const accum = results.filter(w => w.signal === "AKUMULASI").length;
+  const dist = results.filter(w => w.signal === "DISTRIBUSI").length;
+  $("#sumAccum").textContent = accum ? accum + " saham" : "0 saham";
+  $("#sumAccumSub").textContent = accum ? results.filter(w=>w.signal==="AKUMULASI").slice(0,5).map(w=>w.code).join(", ") + (accum>5 ? "…" : "") : "Tidak ada yang terdeteksi";
+  $("#sumDist").textContent = dist ? dist + " saham" : "0 saham";
+  $("#sumDistSub").textContent = dist ? results.filter(w=>w.signal==="DISTRIBUSI").slice(0,5).map(w=>w.code).join(", ") + (dist>5 ? "…" : "") : "Tidak ada yang terdeteksi";
+  $("#sumScanned").textContent = scannedCount + " / " + IDX_TICKERS.length;
+  $("#sumScannedSub").textContent = skipped.length ? skipped.length + " terlewat (tanpa data / dibatasi Yahoo)" : "Semua berhasil dipindai";
+
+  const cache = loadCache();
+  const when = cache ? "Hasil pindai terakhir " + fmtClock(new Date(cache.scannedAt)) + " WIB (data hari ini)" : "";
+  $("#scanMeta").textContent = (results.length ? `${results.length} saham berhasil dianalisa • ${accum} akumulasi • ${dist} distribusi • ${skipped.length} terlewat` : "Belum ada hasil pindai.")
+    + (when ? " • " + when : "") + (scanning ? " • Pindai masih berjalan…" : "");
+
+  if(!filtered.length){
+    el.innerHTML = `<b>${results.length ? "Tidak ada hasil yang cocok dengan filter" : "Belum ada hasil"}</b><p class="muted">${results.length ? "Longgarkan filter (mis. sinyal Semua, min. volume ratio lebih kecil) atau pindai ulang." : "Tekan \"Mulai Pindai Semua Saham\" untuk memulai."}</p>`;
+    return;
+  }
+  const shown = filtered.slice(0, 200);
+  el.innerHTML = `
+    <b>Hasil Whale Detector — ${filtered.length} saham</b>
+    <p class="muted">Diurutkan dari skor Whale tertinggi. Klik baris untuk melihat analisa AI (bull/bear + rencana entry) saham itu. ${filtered.length > 200 ? "Menampilkan 200 teratas — persempit filter untuk melihat sisanya." : ""}</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Kode</th><th>Nama</th><th>Harga</th><th>%</th><th>Volume</th><th>Vol / rata-rata</th><th>Turnover</th><th>Skor Whale</th><th>Sinyal</th></tr></thead>
+      <tbody>${shown.map(w=>`<tr data-code="${w.code}">
+        <td><span style="display:flex;gap:8px;align-items:center">${stockLogoHTML(w.code, 28)}<b>${w.code}</b></span></td>
+        <td><span class="muted" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;max-width:220px">${TICKER_NAME[w.code] || ""}</span></td>
+        <td>${fmtRp(w.price)}</td>
+        <td class="${(w.changePercent||0)>=0?"up":"down"}">${fmtPct(w.changePercent)}</td>
+        <td>${whaleFmtVol(w.volume)}<br><span class="muted">rata-rata ${whaleFmtVol(w.avgVolume)}</span></td>
+        <td><b>${w.volumeRatio==null?"—":w.volumeRatio.toFixed(1)+"x"}</b></td>
+        <td>${whaleFmtTurn(w.turnover)}</td>
+        <td><b>${w.score}</b></td>
+        <td>${whaleSignalBadge(w.signal)}</td>
+      </tr>`).join("")}</tbody>
+    </table></div>
+    <div id="whaleReasons" class="mini" style="margin-top:10px"></div>
+    <p class="mini">Mendeteksi jejak volume besar dari data publik Yahoo (delay ~15 menit), bukan data order book / aliran dana asing yang sebenarnya. Bukan rekomendasi investasi.</p>`;
+  el.querySelectorAll("tbody tr").forEach(tr=>{
+    tr.style.cursor = "pointer";
+    tr.addEventListener("click", ()=>{
+      const w = results.find(r=>r.code===tr.dataset.code);
+      const box = $("#whaleReasons");
+      if(w && box) box.innerHTML = `<b>${w.code} — ${whaleSignalBadge(w.signal)} skor ${w.score}</b><ul>${w.reasons.map(r=>`<li>${r}</li>`).join("")}</ul>`;
+      openDetailAI(tr.dataset.code);
+    });
+  });
+}
+
+function setProgress(done, total){
+  const pct = total ? Math.round(done/total*100) : 0;
+  $("#scanBar").style.width = pct + "%";
+  $("#scanStatus").textContent = scanning ? `Memindai ${done}/${total} saham (${pct}%)` : `Pindai selesai: ${done}/${total} saham`;
+  const elapsed = scanStartedAt ? (Date.now() - scanStartedAt) / 1000 : 0;
+  const rate = elapsed > 0 ? done / elapsed : 0;
+  const remain = rate > 0 ? Math.max(0, (total - done) / rate) : 0;
+  const eta = scanning && remain > 0 ? ` • kira-kira ${Math.ceil(remain/60)} mnt lagi (rata-rata ${rate.toFixed(1)} saham/detik)` : "";
+  $("#scanEta").textContent = eta;
+  $("#scanDetail").textContent = `${results.filter(w=>w.signal==="AKUMULASI").length} akumulasi • ${results.filter(w=>w.signal==="DISTRIBUSI").length} distribusi • ${skipped.length} terlewat • berjalan ${Math.round(elapsed)} detik`;
+}
+
+async function runScan(force){
+  if(scanning) return;
+  if(!force){
+    const c = loadCache();
+    if(c){ // hasil hari ini sudah ada: tampilkan, jangan pindai ulang otomatis
+      results = c.results; skipped = c.skipped || []; scannedCount = c.total;
+      renderResults();
+      $("#btnScan").textContent = "Pindai Ulang Semua Saham";
+      return;
+    }
+  }
+  scanning = true; stopRequested = false;
+  results = []; skipped = []; scannedCount = 0; scanStartedAt = Date.now();
+  $("#btnScan").disabled = true; $("#btnStop").disabled = false;
+  $("#btnScan").textContent = "Memindai…";
+  $("#scanProgress").classList.remove("hidden");
+  renderResults();
+  const codes = IDX_TICKERS.map(t=>t.code);
+  for(let i=0; i<codes.length; i+=BATCH_SIZE){
+    if(stopRequested) break;
+    const batch = codes.slice(i, i+BATCH_SIZE);
+    const settled = await Promise.all(batch.map(async code=>{
+      try{
+        const d = await fetchChartRetry(code);
+        const w = analyzeWhale(code, d.closes||[], d.volumes||[], d.previousClose);
+        if(!w.insufficient) return {ok:true, w};
+        return {ok:false, code}; // data terlalu sedikit: anggap terlewat
+      }catch(e){ return {ok:false, code}; }
+    }));
+    for(const r of settled){
+      if(r.ok) results.push(r.w); else skipped.push(r.code);
+      scannedCount++;
+    }
+    results.sort((a,b)=>b.score-a.score);
+    setProgress(scannedCount, codes.length);
+    renderResults();
+    if(i+BATCH_SIZE < codes.length && !stopRequested){
+      await new Promise(res=>setTimeout(res, BATCH_DELAY_MS));
+    }
+  }
+  scanning = false;
+  $("#btnScan").disabled = false; $("#btnStop").disabled = true;
+  $("#btnScan").textContent = "Pindai Ulang Semua Saham";
+  setProgress(scannedCount, codes.length);
+  renderResults();
+  saveCache();
+}
+
+// ---- Detail analisa AI per saham (pakai ai.js yang sama seperti analisa.html) ----
+async function openDetailAI(code){
+  if(!code) return;
+  const el=$("#aiPanel");
+  el.classList.remove("hidden");
+  el.innerHTML="<p class='muted'>Memuat analisa "+code+"…</p>";
+  try{
+    const r=await fetch(`/api/chart?symbol=${code}.JK&range=3mo`);
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const d=await r.json();
+    const a=analyzeStock(code, d.closes||[], null);
+    const cls = a.verdict==="BULLISH" ? "badge-bull" : a.verdict==="BEARISH" ? "badge-bear" : "badge-neutral";
+    const barColor = a.verdict==="BULLISH" ? "#16a34a" : a.verdict==="BEARISH" ? "#dc2626" : "#94a3b8";
+    el.innerHTML = `
+      <h3>Analisa AI — ${code}</h3>
+      <div class="row"><span class="badge ${cls}" style="font-size:14px">${a.verdict}</span><b>Skor ${a.score}/100</b><span>${suggestionBadge(a.suggestion)}</span></div>
+      <div class="scorebar"><i style="width:${a.score}%;background:${barColor}"></i></div>
+      <div class="mini">Tren: ${a.trend} • Momentum: ${a.momentum}</div>
+      <ul>${a.reasons.map(r=>`<li>${r}</li>`).join("")}</ul>
+      <table class="ai-plan">
+        <tr><td>Saran</td><td><b>${a.suggestion}</b></td></tr>
+        <tr><td>Entry</td><td>${a.entry}</td></tr>
+        <tr><td>Stop loss</td><td>${fmtRp(a.stopLoss)}</td></tr>
+        <tr><td>Target 1</td><td>${fmtRp(a.target1)}</td></tr>
+        <tr><td>Target 2</td><td>${fmtRp(a.target2)}</td></tr>
+      </table>
+      <p class="mini" style="margin-top:8px">${a.riskNote}</p>
+      <p class="mini">Analisa rule-based (MA20/MA50, RSI, MACD, support/resistance) dari data Yahoo Finance — bukan rekomendasi investasi dan bukan prediksi pasti.</p>`;
+    el.scrollIntoView({behavior:"smooth"});
+  }catch(e){ el.innerHTML="<p class='muted'>Gagal memuat analisa "+code+": "+e.message+"</p>"; }
+}
+
+$("#btnScan").addEventListener("click", ()=>runScan(true));
+$("#btnRescan").addEventListener("click", ()=>runScan(true));
+$("#btnStop").addEventListener("click", ()=>{ stopRequested = true; $("#btnStop").disabled = true; $("#scanStatus").textContent = "Menghentikan pindai…"; });
+["fSignal","fRatio","fTurn"].forEach(id=>$("#"+id).addEventListener("change", renderResults));
+$("#fSearch").addEventListener("input", renderResults);
+$("#topSearch").addEventListener("input", e=>{ $("#fSearch").value = e.target.value; renderResults(); });
+
+
+
+// Muat hasil pindai hari ini bila ada; kalau belum ada, tampilkan empty state.
+(function init(){ const c = loadCache();
+  if(c){ results = c.results; skipped = c.skipped || []; scannedCount = c.total; renderResults(); $("#btnScan").textContent = "Pindai Ulang Semua Saham"; }
+  else { renderResults(); }
+})();
+
+
+</script>

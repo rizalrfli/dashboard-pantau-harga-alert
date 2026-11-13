@@ -1,0 +1,109 @@
+---
+import "../styles/global.css";
+---
+
+<!doctype html>
+<html lang="id" data-type="software">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Masuk — Screener AI</title>
+    <meta name="description" content="Masuk ke dashboard Pantau Saham IDX." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="login-page">
+<main class="login-card">
+  <div class="logo"><span class="logo-mark">S</span><div><b>Screener AI</b><span>Pantau Saham IDX</span></div></div>
+  <h1>Masuk ke dashboard</h1>
+  <p class="sub">Halaman ini dikunci — masukkan password untuk melanjutkan.</p>
+
+  <p id="loginError" class="err hidden">Password salah. Coba lagi.</p>
+  <form id="loginForm">
+    <label for="password">Password</label>
+    <input id="password" type="password" autocomplete="current-password" autofocus>
+    <button type="submit">Masuk</button>
+  </form>
+
+  <details class="change">
+    <summary>Ganti password</summary>
+    <p id="changeError" class="err hidden">Password lama salah.</p>
+    <p id="changeOk" class="ok hidden">Hash baru dibuat. Tempel hash di bawah ke <b>PASSWORD_HASH</b> di <b>auth.js</b>, lalu push ulang ke GitHub — password baru aktif setelah Vercel redeploy.</p>
+    <form id="changeForm">
+      <div class="field"><label for="oldPass">Password lama</label><input id="oldPass" type="password" autocomplete="current-password"></div>
+      <div class="field"><label for="newPass">Password baru</label><input id="newPass" type="password" autocomplete="new-password"></div>
+      <button type="submit" class="secondary">Buat hash baru</button>
+    </form>
+    <div id="hashOut" class="hash-out hidden"></div>
+    <button id="copyHash" type="button" class="secondary hidden">Salin hash</button>
+    <p class="note">Yang ditampilkan hanya hash SHA-256, bukan passwordnya. Hash lama di auth.js tetap berlaku sampai kamu menggantinya dan redeploy.</p>
+  </details>
+
+  <footer>Data dari Yahoo Finance, bisa delay ~15 menit. Bukan rekomendasi investasi.</footer>
+</main>
+
+    <script>
+import { sha256Hex, PASSWORD_HASH, isLoggedIn, SESSION_KEY } from "../lib/auth.js";
+
+(function () {
+  var params = new URLSearchParams(location.search);
+  var next = params.get("next") || "index.html";
+  // Hanya izinkan redirect internal, jangan ke situs lain.
+  if (!/^(index\.html|analisa\.html)/.test(next)) next = "index.html";
+
+  // Kalau sudah login, langsung lanjut — tidak perlu login dua kali.
+  if (isLoggedIn()) { location.replace(next); return; }
+
+  document.getElementById("loginForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var pw = document.getElementById("password").value;
+    if (pw && sha256Hex(pw) === PASSWORD_HASH) {
+      try { sessionStorage.setItem(SESSION_KEY, "1"); } catch (err) {}
+      location.replace(next);
+    } else {
+      document.getElementById("loginError").classList.remove("hidden");
+      document.getElementById("password").value = "";
+      document.getElementById("password").focus();
+    }
+  });
+
+  document.getElementById("changeForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var oldPw = document.getElementById("oldPass").value;
+    var newPw = document.getElementById("newPass").value;
+    var errEl = document.getElementById("changeError");
+    var okEl = document.getElementById("changeOk");
+    errEl.classList.add("hidden"); okEl.classList.add("hidden");
+    if (!oldPw || sha256Hex(oldPw) !== PASSWORD_HASH) {
+      errEl.classList.remove("hidden");
+      return;
+    }
+    if (!newPw || newPw.length < 4) {
+      errEl.textContent = "Password baru minimal 4 karakter — pakai yang lebih panjang supaya aman.";
+      errEl.classList.remove("hidden");
+      return;
+    }
+    var hash = sha256Hex(newPw);
+    var out = document.getElementById("hashOut");
+    out.textContent = hash;
+    out.classList.remove("hidden");
+    document.getElementById("copyHash").classList.remove("hidden");
+    okEl.classList.remove("hidden");
+    document.getElementById("newPass").value = "";
+    document.getElementById("oldPass").value = "";
+  });
+
+  document.getElementById("copyHash").addEventListener("click", function () {
+    var hash = document.getElementById("hashOut").textContent;
+    if (navigator.clipboard) navigator.clipboard.writeText(hash);
+  });
+})();
+
+    </script>
+  </body>
+</html>

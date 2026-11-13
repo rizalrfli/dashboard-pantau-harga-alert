@@ -1,0 +1,93 @@
+---
+// src/layouts/BaseLayout.astro — kerangka semua halaman ber-shell:
+// <head> (meta, font, favicon, auth guard), sidebar, topbar, slot konten.
+// Halaman login TIDAK memakai layout ini (standalone, tanpa shell).
+import "../styles/global.css";
+import Sidebar from "../components/Sidebar.astro";
+import Topbar from "../components/Topbar.astro";
+
+interface Props {
+  title: string;
+  description: string;
+  active: "watch" | "analisa" | "whale";
+  /** true hanya di halaman Watchlist (Alert/Portofolio jadi tombol tab, bukan link) */
+  onIndex?: boolean;
+  searchPlaceholder?: string;
+  showRefresh?: boolean;
+  searchDropdown?: boolean;
+}
+
+const {
+  title,
+  description,
+  active,
+  onIndex = false,
+  searchPlaceholder = "Cari kode / nama saham…",
+  showRefresh = true,
+  searchDropdown = false,
+} = Astro.props;
+---
+<!doctype html>
+<html lang="id" data-type="software">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{title}</title>
+    <meta name="page-type" content="software" />
+    <meta name="site-kind" content="software" />
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script is:inline>
+      // Auth guard — jalan di <head> sebelum konten tampil, supaya halaman
+      // tidak sempat berkedip saat belum login. Logika lengkap ada di
+      // src/lib/auth.js (guardAuth); di sini hanya cek sesi agar tidak
+      // menunggu modul JavaScript dimuat.
+      (function () {
+        try {
+          var p = location.pathname || "";
+          var onLogin = p.endsWith("login.html") || p.endsWith("login");
+          if (
+            !onLogin &&
+            sessionStorage.getItem("cibung_auth") !== "1"
+          ) {
+            location.replace(
+              "login.html?next=" +
+                encodeURIComponent(
+                  location.pathname + location.search + location.hash
+                )
+            );
+          }
+        } catch (e) {
+          /* sessionStorage tidak tersedia: biarkan halaman tampil */
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Lewati ke konten</a>
+    <div class="app">
+      <Sidebar active={active} onIndex={onIndex} />
+      <div class="main">
+        <Topbar
+          searchPlaceholder={searchPlaceholder}
+          showRefresh={showRefresh}
+          searchDropdown={searchDropdown}
+        />
+        <main class="wrap" id="main">
+          <slot />
+        </main>
+      </div>
+    </div>
+    <script>
+      import { initMenu, initLogout } from "../lib/menu.js";
+      initMenu();
+      initLogout();
+    </script>
+  </body>
+</html>

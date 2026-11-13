@@ -1,0 +1,211 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout
+  title="Analisa AI — Screener AI"
+  description="Analisa AI rule-based semua saham watchlist IDX: arah bull/bear, saran masuk, dan scalping."
+  active="analisa"
+  searchPlaceholder="Cari di tabel analisa…"
+>
+
+      <div class="page-head">
+        <h1>Analisa AI</h1>
+        <div class="sub">Analisa rule-based semua saham di watchlist — arah bull/bear, saran masuk, dan scalping. Data Yahoo Finance, refresh otomatis 60 detik.</div>
+        <div id="lastUpdate" class="sub"></div>
+      </div>
+      <div id="globalError" class="err hidden"></div>
+
+      <section class="summary">
+        <div class="sum-card">
+          <div class="sum-label">Boleh masuk hari ini</div>
+          <div class="sum-value" id="sumMasuk">—</div>
+          <div class="sum-sub" id="sumMasukSub">Jalankan Analisa Semua Saham</div>
+        </div>
+        <div class="sum-card">
+          <div class="sum-label">Cocok untuk scalping</div>
+          <div class="sum-value" id="sumScalp">—</div>
+          <div class="sum-sub" id="sumScalpSub">Jalankan Analisa Semua Saham</div>
+        </div>
+      </section>
+
+      <div class="toolbar">
+        <button id="btnNotif">Aktifkan notifikasi</button>
+        <button id="btnAnalyzeAll" class="primary">Analisa Semua Saham</button>
+      </div>
+
+      <div id="aiSummary" class="panel ai-summary"><p class="muted">Belum dianalisa. Tekan "Analisa Semua Saham" untuk menganalisa semua saham di watchlist.</p></div>
+      <div id="aiPanel" class="ai-panel hidden"></div>
+
+      <footer>Data dari Yahoo Finance, bisa delay ~15 menit. Bukan rekomendasi investasi — selalu cek lagi sebelum membeli atau menjual saham.</footer>
+    
+</BaseLayout>
+
+<script>
+import { fmtRp, fmtPct, analyzeStock, analyzeScalping, fmtVol, fmtTurn, verdictBadge, suggestionBadge } from "../lib/ai.js";
+import { stockLogoHTML } from "../lib/logos.js";
+import { renderAiPanel } from "../lib/analysisPanel.js";
+
+const LS = { watch:"idx_watchlist" };
+const $ = s => document.querySelector(s);
+const DEFAULT_WATCH = ["BBCA","BBRI","BMRI","BBNI","TLKM","ASII","GOTO","AMRT"];
+function load(k, d){ try{ const v=JSON.parse(localStorage.getItem(k)); return v??d; }catch(e){ return d; } }
+let watch = load(LS.watch, DEFAULT_WATCH);
+let prices = {};
+let analysis = {};
+
+async function apiQuote(symbols){
+  const r = await fetch("/api/quote?symbols=" + symbols.map(encodeURIComponent).join(","));
+  if(!r.ok) throw new Error("HTTP " + r.status);
+  return r.json();
+}
+async function refreshQuotes(){
+  if(!watch.length) return;
+  try{
+    const data = await apiQuote(watch.map(c=>c+".JK"));
+    data.results.forEach(q=>{ prices[q.symbol]=q; });
+    const mts = data.results.map(q=>q.marketTime).filter(Boolean).map(t=>new Date(t).getTime()).filter(n=>!isNaN(n));
+    const now = new Date();
+    const fmtTime = d => d.toLocaleTimeString("id-ID",{timeZone:"Asia/Jakarta", hour:"2-digit", minute:"2-digit"});
+    if(mts.length){
+      const latest = Math.max(...mts);
+      const delayMin = Math.max(0, Math.round((now.getTime()-latest)/60000));
+      const el = $("#lastUpdate");
+      el.textContent = `Data bursa per ${fmtTime(new Date(latest))} WIB • telat ${delayMin} mnt • dicek ${fmtTime(now)} WIB`;
+      el.style.color = delayMin > 15 ? "#d97706" : "";
+    } else {
+      $("#lastUpdate").textContent = "Terakhir dicek: " + fmtTime(now) + " WIB (jam data bursa tidak tersedia)";
+    }
+  }catch(e){
+    const el=$("#globalError"); el.textContent="Gagal memuat harga: "+e.message+". Coba refresh lagi."; el.classList.remove("hidden");
+  }
+}
+
+
+async function analyzeAll(){
+  const btn=$("#btnAnalyzeAll");
+  if(!watch.length){ alert("Watchlist kosong — tambah saham dulu."); return; }
+  btn.disabled=true;
+  const panel=$("#aiSummary");
+  panel.classList.remove("hidden");
+  const rows=[];
+  for(let i=0;i<watch.length;i++){
+    const code=watch[i];
+    btn.textContent=`Menganalisa… ${i+1}/${watch.length} (${code})`;
+    panel.innerHTML=`<b>Analisa Semua</b><p class="muted">Menganalisa ${code} (${i+1}/${watch.length})…</p>`;
+    try{
+      const r=await fetch(`/api/chart?symbol=${code}.JK&range=3mo`);
+      if(!r.ok) throw new Error("HTTP "+r.status);
+      const d=await r.json();
+      const a=analyzeStock(code, d.closes||[], prices[code+".JK"]);
+      analysis[code]=a;
+      const scalp=analyzeScalping(code, d.volumes||[], prices[code+".JK"], a);
+      rows.push({code, a, scalp});
+    }catch(e){ console.warn("analisa gagal", code, e); }
+  }
+  btn.disabled=false; btn.textContent="Analisa Semua Saham";
+  if(!rows.length){ panel.innerHTML="<b>Analisa Semua</b><p class='muted'>Gagal menganalisa semua saham — coba refresh lalu ulangi.</p>"; return; }
+  rows.sort((x,y)=>y.a.score-x.a.score);
+  const bull=rows.filter(r=>r.a.verdict==="BULLISH").length;
+  const bear=rows.filter(r=>r.a.verdict==="BEARISH").length;
+  const net=rows.length-bull-bear;
+  const best=rows[0];
+  // --- 1) Saham yang boleh masuk hari ini (kriteria ketat, jangan dipaksa) ---
+  const bolehMasuk=rows.filter(({a})=>
+    a.verdict==="BULLISH" && a.score>=65
+    && a.rsi!=null && a.rsi>=40 && a.rsi<=65
+    && a.ma20!=null && a.ma50!=null && a.price>a.ma20 && a.price>a.ma50
+    && a.macdHist!=null && a.macdHist>0
+    && (a.changePercent??0)>=0
+  ).sort((x,y)=>y.a.score-x.a.score);
+  // --- 2) Cocok untuk scalping (skor scalping terpisah) ---
+  const scalpers=rows.filter(r=>r.scalp?.eligible).sort((x,y)=>y.scalp.score-x.scalp.score);
+  // --- Kartu ringkasan di atas ---
+  const sm=$("#sumMasuk"), ss=$("#sumScalp");
+  if(sm){ sm.textContent = bolehMasuk.length ? bolehMasuk.length + " saham" : "0 saham"; }
+  const sms=$("#sumMasukSub"); if(sms) sms.textContent = bolehMasuk.length ? bolehMasuk.map(r=>r.code).join(", ") : "Tidak ada yang lolos hari ini";
+  if(ss){ ss.textContent = scalpers.length ? scalpers.length + " saham" : "0 saham"; }
+  const sss=$("#sumScalpSub"); if(sss) sss.textContent = scalpers.length ? scalpers.map(r=>r.code).join(", ") : "Tidak ada yang cocok hari ini";
+  panel.innerHTML = `
+    <b>Analisa Semua — ${rows.length} saham</b>
+    <p class="muted">${bull} bullish, ${net} netral, ${bear} bearish — paling kuat ${best.code} (skor ${best.a.score}, ${best.a.verdict}, saran: ${best.a.suggestion}). Saran "Wait and See (WNS)" = sinyal masih bertentangan/netral, jangan masuk dulu, tunggu konfirmasi tembus resistance/MA20; "Tunggu" = sudah bullish tapi RSI ≥70, tunggu koreksi ke MA20.</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Kode</th><th>Harga</th><th>%</th><th>RSI</th><th>MA20 / MA50</th><th>MACD</th><th>Skor</th><th>Arah</th><th>Saran</th></tr></thead>
+      <tbody>${rows.map(({code,a})=>`<tr>
+        <td><span style="display:flex;gap:8px;align-items:center">${stockLogoHTML(code, 28)}<b>${code}</b></span></td>
+        <td>${fmtRp(a.price)}</td>
+        <td class="${(a.changePercent||0)>=0?"up":"down"}">${fmtPct(a.changePercent)}</td>
+        <td>${a.rsi==null?"—":a.rsi.toFixed(1)}</td>
+        <td>${fmtRp(a.ma20)} / ${fmtRp(a.ma50)}</td>
+        <td>${a.macdHist==null?"—":(a.macdHist>=0?"+":"")+Math.round(a.macdHist)}</td>
+        <td><b>${a.score}</b></td>
+        <td>${verdictBadge(a)}</td>
+        <td>${suggestionBadge(a.suggestion)}</td>
+      </tr>`).join("")}</tbody>
+    </table></div>
+    <h3 style="margin-top:16px">Saham yang boleh masuk hari ini</h3>
+    <p class="mini">Kriteria lolos (semua harus terpenuhi): verdict BULLISH, skor ≥65, RSI 40-65 (tidak overbought), harga di atas MA20 dan MA50, MACD histogram positif, dan % harian tidak negatif. Diurutkan dari skor tertinggi.</p>
+    ${bolehMasuk.length ? `<div class="tablewrap"><table>
+      <thead><tr><th>Kode</th><th>Skor</th><th>RSI</th><th>Entry</th><th>Stop loss</th><th>Target 1</th><th>Target 2</th></tr></thead>
+      <tbody>${bolehMasuk.map(({code,a})=>`<tr>
+        <td><span style="display:flex;gap:8px;align-items:center">${stockLogoHTML(code, 28)}<b>${code}</b></span></td><td><b>${a.score}</b></td><td>${a.rsi.toFixed(1)}</td>
+        <td>${a.entry}</td><td>${fmtRp(a.stopLoss)}</td><td>${fmtRp(a.target1)}</td><td>${fmtRp(a.target2)}</td>
+      </tr>`).join("")}</tbody>
+    </table></div>` : `<p><b>Hari ini tidak ada saham yang lolos kriteria masuk — semua WNS/Hindari.</b> Jangan paksa masuk; tunggu sampai ada saham yang memenuhi semua kriteria di atas.</p>`}
+    <h3 style="margin-top:16px">Cocok untuk scalping</h3>
+    <p class="mini">Kriteria lolos: range harian (high-low)/prev close minimal 1,5%, likuiditas tinggi (volume ≥5 jt lembar dan turnover ≥Rp5 miliar), RSI 45-65, MACD positif, harga di atas MA20. Skor scalping 0-100: range +30, likuiditas +25, RSI +20, MACD +15, di atas MA20 +10. Scalping = trading cepat dalam sehari: pakai stop loss ketat, jangan tahan lama, dan jangan kejar harga.</p>
+    ${scalpers.length ? `<div class="tablewrap"><table>
+      <thead><tr><th>Kode</th><th>Range harian</th><th>Volume</th><th>RSI</th><th>Skor scalping</th><th>Catatan</th></tr></thead>
+      <tbody>${scalpers.map(({code,a,scalp})=>`<tr>
+        <td><span style="display:flex;gap:8px;align-items:center">${stockLogoHTML(code, 28)}<b>${code}</b></span></td>
+        <td>${scalp.rangePct==null?"—":scalp.rangePct.toFixed(1)+"%"}</td>
+        <td>${fmtVol(scalp.volume)}<br><span class="muted">turnover ${fmtTurn(scalp.turnover)}</span></td>
+        <td>${a.rsi==null?"—":a.rsi.toFixed(1)}</td>
+        <td><b>${scalp.score}</b></td>
+        <td style="min-width:260px">${scalp.note}</td>
+      </tr>`).join("")}</tbody>
+    </table></div>` : `<p><b>Hari ini tidak ada saham yang cocok untuk scalping.</b> Range harian terlalu kecil, likuiditas kurang, atau RSI/MACD tidak mendukung — lebih aman tidak scalping hari ini.</p>`}
+    <p class="mini">Klik baris saham di tabel ringkasan untuk melihat alasan detail + rencana entry di panel Analisa AI di bawah. Semua analisa di atas rule-based dari data Yahoo Finance (delay ~10-15 menit) — bukan rekomendasi investasi dan bukan prediksi pasti.</p>`;
+  // Klik baris di tabel ringkasan -> panel analisa per saham di bawah
+  panel.querySelectorAll(".tablewrap table tbody tr").forEach(tr=>{
+    tr.style.cursor="pointer";
+    tr.addEventListener("click", ()=>openDetailAI(tr.querySelector("td b")?.textContent?.trim()));
+  });
+}
+
+async function openDetailAI(code){
+  if(!code) return;
+  const el=$("#aiPanel");
+  el.classList.remove("hidden");
+  el.innerHTML="<p class='muted'>Memuat analisa "+code+"…</p>";
+  try{
+    const r=await fetch(`/api/chart?symbol=${code}.JK&range=3mo`);
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const d=await r.json();
+    const a=analyzeStock(code, d.closes||[], prices[code+".JK"]);
+    analysis[code]=a;
+    renderAiPanel(code, a);
+    el.scrollIntoView({behavior:"smooth"});
+  }catch(e){ el.innerHTML="<p class='muted'>Gagal memuat analisa "+code+": "+e.message+"</p>"; }
+}
+$("#btnAnalyzeAll").addEventListener("click", analyzeAll);
+$("#btnRefresh").addEventListener("click", async ()=>{ await refreshQuotes(); if(Object.keys(analysis).length) analyzeAll(); });
+$("#btnNotif").addEventListener("click", async ()=>{
+  if(!("Notification" in window)) return alert("Browser ini tidak mendukung notifikasi.");
+  const p = await Notification.requestPermission();
+  alert(p==="granted" ? "Notifikasi diaktifkan." : "Notifikasi: "+p);
+});
+$("#topSearch").addEventListener("input", e=>{
+  const term=(e.target.value||"").trim().toUpperCase();
+  document.querySelectorAll("#aiSummary tbody tr").forEach(tr=>{
+    tr.style.display = !term || tr.textContent.toUpperCase().includes(term) ? "" : "none";
+  });
+});
+
+
+
+
+(async ()=>{ await refreshQuotes(); if(watch.length) analyzeAll(); })();
+setInterval(async ()=>{ await refreshQuotes(); }, 60000);
+
+</script>

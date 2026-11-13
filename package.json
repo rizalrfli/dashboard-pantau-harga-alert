@@ -1,0 +1,1 @@
+{"dependencies":{"astro":"^7.4.11"},"description":"Screener AI — dashboard pantau saham IDX (harga, alert, analisa AI rule-based, Whale Detector). Astro statis + Vercel Serverless Functions sebagai proxy Yahoo Finance.","name":"screener-ai","private":true,"scripts":{"build":"astro build","dev":"astro dev","preview":"astro preview"},"version":"1.0.0"}

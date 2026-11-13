@@ -1,0 +1,41 @@
+---
+// src/components/Topbar.astro — baris atas: pencarian, Refresh, chip user, Logout.
+// Perilaku pencarian berbeda per halaman dan dipasang oleh script halaman
+// (index: dropdown tambah saham; analisa: filter tabel; whale: filter hasil).
+interface Props {
+  searchPlaceholder?: string;
+  showRefresh?: boolean;
+  /** true hanya di Watchlist: tampilkan dropdown hasil pencarian */
+  searchDropdown?: boolean;
+}
+
+const {
+  searchPlaceholder = "Cari kode / nama saham…",
+  showRefresh = true,
+  searchDropdown = false,
+} = Astro.props;
+---
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="search-wrap">
+      <input
+        id="topSearch"
+        placeholder={searchPlaceholder}
+        autocomplete="off"
+        role={searchDropdown ? "combobox" : undefined}
+        aria-expanded={searchDropdown ? "false" : undefined}
+        aria-controls={searchDropdown ? "searchDrop" : undefined}
+      />
+      {
+        searchDropdown && (
+          <div id="searchDrop" class="search-drop hidden" role="listbox" />
+        )
+      }
+    </div>
+    {showRefresh && <button id="btnRefresh" class="primary">Refresh harga</button>}
+    <div class="user-chip">
+      <span class="avatar">R</span><div><b>Rizal</b><span>Trader IDX</span></div>
+    </div>
+    <button id="btnLogout" type="button" data-logout>Logout</button>
+  </div>
+</div>
