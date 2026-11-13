@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<!DOCTYPE html>
+<html lang="id" data-type="software">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Analisa AI — Screener AI</title>
+<meta name="page-type" content="software">
+<meta name="site-kind" content="software">
+<meta name="description" content="Analisa AI rule-based semua saham watchlist IDX: arah bull/bear, saran masuk, dan scalping.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="auth.js"></script>
+<style>
+  /* ---- Satu sistem (taste-skill): satu radius, satu bayangan, satu pasangan tombol ---- */
+  :root{
+    --bg:#f6f7f8; --panel:#ffffff; --surface:#f8fafc; --line:#e3e6ea; --line-strong:#d1d5db;
+    --text:#111827; --muted:#5b6470; --faint:#8a94a3;
+    --green:#15803d; --green-bg:#dcfce7; --red:#b91c1c; --red-bg:#fee2e2;
+    --amber:#92400e; --amber-bg:#fef3c7;
+    --blue:#1d4ed8;
+    --orange:#ff7a1a;           /* aksen merek: mark, garis grafik */
+    --action:#c2410c;           /* tombol isi oranye — putih di atasnya 4,6:1 */
+    --action-hover:#9a3412;
+    --r-lg:12px; --r-md:8px; --r-sm:6px;
+    --shadow:0 1px 2px rgba(16,24,40,.06);
+    --shadow-lift:0 4px 12px rgba(16,24,40,.10);
+    --s-1:4px; --s-2:8px; --s-3:12px; --s-4:16px; --s-5:24px; --s-6:32px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:auto}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    font-size:16px;line-height:1.5}
+  :focus-visible{outline:2px solid var(--action);outline-offset:2px;border-radius:var(--r-sm)}
+  .skip-link{position:absolute;left:16px;top:-48px;z-index:20;background:var(--text);color:#fff;padding:8px 12px;border-radius:var(--r-md);text-decoration:none}
+  .skip-link:focus{top:8px}
+  .app{display:flex;min-height:100vh}
+  /* ---- Sidebar ---- */
+  .sidebar{width:232px;flex-shrink:0;background:var(--panel);border-right:1px solid var(--line);padding:var(--s-4) var(--s-3);position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:var(--s-1)}
+  .logo{display:flex;gap:10px;align-items:center;padding:var(--s-1) var(--s-2) var(--s-4);border-bottom:1px solid var(--line);margin-bottom:var(--s-2)}
+  .logo-mark{width:38px;height:38px;border-radius:var(--r-md);background:var(--orange);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+  .logo b{display:block;font-size:17px;letter-spacing:.01em}
+  .logo span{display:block;font-size:12px;color:var(--muted)}
+  .side-label{font-size:13px;font-weight:500;color:var(--muted);padding:10px 10px 4px}
+  .side-nav{display:flex;flex-direction:column;gap:var(--s-1)}
+  .side-btn{display:flex;text-decoration:none;align-items:center;gap:10px;width:100%;text-align:left;padding:11px 12px;border:none;border-radius:var(--r-md);background:transparent;color:#334155;font-weight:500;font-size:15px;cursor:pointer;font-family:inherit;min-height:44px;transition:background .15s ease}
+  .side-btn.active{background:var(--action);color:#fff}
+  .side-btn:hover:not(.active){background:var(--surface)}
+  .side-foot{margin-top:auto;font-size:13px;color:var(--muted);padding:10px;line-height:1.6}
+  /* ---- Area utama ---- */
+  .main{flex:1;min-width:0}
+  .topbar{position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--line);z-index:5}
+  .topbar-inner{display:flex;gap:10px;align-items:center;padding:12px 16px;max-width:1020px;margin:0 auto}
+  .search-wrap{flex:1;min-width:120px;position:relative}
+  .search-wrap input{width:100%}
+  .search-drop{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--panel);border:1px solid var(--line-strong);border-radius:var(--r-md);box-shadow:var(--shadow-lift);max-height:320px;overflow-y:auto;z-index:10}
+  .search-drop button{display:flex;justify-content:space-between;gap:12px;width:100%;text-align:left;border:none;border-radius:0;background:var(--panel);padding:10px 12px;min-height:44px;font-size:15px}
+  .search-drop button:hover,.search-drop button:focus-visible{background:var(--surface)}
+  .search-drop b{font-weight:600}
+  .search-drop span{color:var(--muted);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .search-drop .in-watch{color:var(--green)}
+  #topSearch{flex:1;min-width:120px}
+  .user-chip{display:flex;gap:8px;align-items:center;flex-shrink:0}
+  .avatar{width:36px;height:36px;border-radius:50%;background:var(--orange);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px}
+  .user-chip b{display:block;font-size:14px;line-height:1.2}
+  .user-chip span{display:block;font-size:12px;color:var(--muted);line-height:1.2}
+  .wrap{max-width:1020px;margin:0 auto;padding:var(--s-4) var(--s-4)}
+  .page-head{padding-top:var(--s-2)}
+  h1{font-size:28px;line-height:1.2;margin:0;font-weight:700;letter-spacing:-.01em}
+  h2{font-size:20px;line-height:1.3;margin:0;font-weight:600}
+  h3{font-size:16px;line-height:1.4;margin:0;font-weight:600}
+  .sub{color:var(--muted);font-size:14px}
+  #lastUpdate{margin-top:var(--s-1);font-weight:500;color:#334155}
+  /* ---- Kartu ringkasan ---- */
+  .summary{display:grid;grid-template-columns:1fr;gap:var(--s-4);margin:var(--s-4) 0}
+  .sum-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);padding:var(--s-4);box-shadow:var(--shadow)}
+  .sum-label{font-size:13px;font-weight:500;color:var(--muted)}
+  .sum-value{font-size:28px;font-weight:700;color:var(--text);margin-top:var(--s-1);font-variant-numeric:tabular-nums}
+  .sum-sub{font-size:14px;color:var(--muted);margin-top:2px}
+  .ihsg{display:flex;gap:8px 14px;flex-wrap:wrap;align-items:baseline;margin-top:6px}
+  .ihsg b{font-size:22px;font-variant-numeric:tabular-nums}
+  .up{color:var(--green)} .down{color:var(--red)} .muted{color:var(--muted)}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:var(--s-4) 0}
+  button,input,select{background:#fff;color:var(--text);border:1px solid var(--line-strong);border-radius:var(--r-md);padding:9px 12px;font:inherit;font-size:15px;min-height:40px}
+  button{cursor:pointer;transition:background .15s ease,border-color .15s ease,transform .05s ease}
+  button:active{transform:translateY(1px)}
+  button.primary{background:var(--action);color:#fff;border-color:var(--action);font-weight:500}
+  button.primary:hover{background:var(--action-hover);border-color:var(--action-hover)}
+  button:not(.primary):not(.side-btn):not(.del):hover{border-color:var(--text)}
+  .tabs{display:flex;gap:6px;margin:6px 0 var(--s-4)}
+  .tabs button.active{background:var(--action);color:#fff;border-color:var(--action)}
+  .grid{display:grid;grid-template-columns:1fr;gap:var(--s-3)}
+  @media(min-width:760px){.grid{grid-template-columns:1fr 1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);padding:var(--s-4);cursor:pointer;box-shadow:var(--shadow);transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease}
+  .card:hover{transform:translateY(-2px);box-shadow:var(--shadow-lift);border-color:var(--line-strong)}
+  .card .sym{font-size:18px;font-weight:600}
+  .card .name{color:var(--muted);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .price{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+  .price.up{color:var(--green)}
+  .price.down{color:var(--red)}
+  .row{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+  .mini{font-size:14px;color:var(--muted)}
+  .chip{display:inline-block;background:var(--panel);border:1px solid var(--line-strong);border-radius:999px;padding:4px 10px;margin:2px 4px 2px 0;cursor:pointer;font-size:14px;color:#334155;min-height:32px}
+  .chip:hover{border-color:var(--action);color:var(--action)}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);padding:var(--s-4);margin-top:var(--s-3);box-shadow:var(--shadow)}
+  .hidden{display:none!important}
+  canvas{width:100%;height:220px;background:#fff;border:1px solid var(--line);border-radius:var(--r-md)}
+  .stat{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px}
+  @media(min-width:760px){.stat{grid-template-columns:repeat(4,1fr)}}
+  .stat div{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);padding:8px}
+  .stat small{color:var(--muted);display:block;font-size:13px}
+  .stat b{font-variant-numeric:tabular-nums}
+  table{width:100%;border-collapse:collapse;font-size:15px}
+  th,td{padding:8px 4px;border-bottom:1px solid var(--line);text-align:left;font-variant-numeric:tabular-nums}
+  th{color:var(--muted);font-size:13px;font-weight:500}
+  .alert-item,.trig{border:1px solid var(--line);border-left:3px solid var(--amber);padding:8px 10px;margin:8px 0;background:var(--panel);border-radius:var(--r-sm)}
+  .trig{border-left-color:var(--red)}
+  footer{color:var(--muted);font-size:13px;margin:var(--s-6) 0;text-align:center}
+  .empty{padding:var(--s-5);text-align:center;color:var(--muted);border:1px dashed var(--line-strong);border-radius:var(--r-lg);background:var(--panel)}
+  .err{background:var(--panel);border:1px solid var(--red);color:var(--red);padding:10px;border-radius:var(--r-md);margin:10px 0}
+  form.inline{display:flex;gap:8px;flex-wrap:wrap;align-items:end}
+  form.inline label{font-size:13px;color:var(--muted);display:block}
+  .del{background:none;border:none;color:var(--red);padding:2px 6px;min-height:32px}
+  /* ---- Analisa AI ---- */
+  .badge{display:inline-block;border-radius:999px;padding:2px 9px;font-size:13px;font-weight:600;white-space:nowrap}
+  .badge-bull{background:var(--green-bg);color:var(--green);border:1px solid #bbf7d0}
+  .badge-bear{background:var(--red-bg);color:var(--red);border:1px solid #fecaca}
+  .badge-neutral{background:var(--surface);color:var(--muted);border:1px solid var(--line)}
+  .badge-wns{background:var(--amber-bg);color:var(--amber);border:1px solid #fde68a}
+  .scorebar{height:10px;background:var(--line);border-radius:999px;overflow:hidden;margin:6px 0}
+  .scorebar i{display:block;height:100%;border-radius:999px}
+  .ai-panel{margin-top:var(--s-3);border:1px solid var(--line);border-radius:var(--r-lg);padding:var(--s-4);background:var(--panel);box-shadow:var(--shadow)}
+  .ai-panel h3{margin:0 0 8px;font-size:16px}
+  .ai-panel ul{margin:8px 0;padding-left:20px;font-size:15px}
+  .ai-panel li{margin-bottom:4px}
+  .ai-plan{width:100%;border-collapse:collapse;font-size:15px;margin-top:8px}
+  .ai-plan td{padding:6px 4px;border-bottom:1px solid var(--line)}
+  .ai-plan td:first-child{color:var(--muted);width:110px}
+  .tablewrap{overflow-x:auto;margin-top:10px}
+  .tablewrap table{min-width:760px}
+  .ai-summary{margin-top:var(--s-3)}
+  @media(max-width:860px){
+    .app{flex-direction:column}
+    .sidebar{width:100%;height:auto;position:static;padding:10px 12px}
+    .side-nav{flex-direction:row;overflow-x:auto;gap:6px}
+    .side-btn{width:auto;white-space:nowrap}
+    .side-foot{display:none}
+    .logo{border-bottom:none;padding-bottom:4px}
+    .summary{grid-template-columns:1fr}
+    .user-chip div{display:none}
+    button,input,select{min-height:44px}
+    .tabs button{flex:1}
+  }
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Lewati ke konten</a>
+<div class="app">
+  <aside class="sidebar">
+    <div class="logo"><span class="logo-mark">S</span><div><b>Screener AI</b><span>Pantau Saham IDX</span></div></div>
+    <div class="side-label">Menu</div>
+    <nav class="side-nav">
+      <a class="side-btn" href="index.html">Watchlist</a>
+      <a class="side-btn active" href="analisa.html">Analisa AI</a>
+      <a class="side-btn" href="index.html#alerts">Alert</a>
+      <a class="side-btn" href="index.html#port">Portofolio</a>
+    </nav>
+    <div class="side-foot">Data Yahoo Finance<br>Bisa delay ~15 menit<br>Bukan rekomendasi investasi</div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar"><div class="topbar-inner">
+      <div class="search-wrap"><input id="topSearch" placeholder="Cari di tabel analisa…" autocomplete="off"></div>
+      <button id="btnRefresh" class="primary">Refresh harga</button>
+      <div class="user-chip"><span class="avatar">R</span><div><b>Rizal</b><span>Trader IDX</span></div></div>
+      <button id="btnLogout" type="button" onclick="logout()">Logout</button>
+    </div></div>
+
+    <main class="wrap" id="main">
+      <div class="page-head">
+        <h1>Analisa AI</h1>
+        <div class="sub">Analisa rule-based semua saham di watchlist — arah bull/bear, saran masuk, dan scalping. Data Yahoo Finance, refresh otomatis 60 detik.</div>
+        <div id="lastUpdate" class="sub"></div>
+      </div>
+      <div id="globalError" class="err hidden"></div>
+
+      <section class="summary">
+        <div class="sum-card">
+          <div class="sum-label">Boleh masuk hari ini</div>
+          <div class="sum-value" id="sumMasuk">—</div>
+          <div class="sum-sub" id="sumMasukSub">Jalankan Analisa Semua Saham</div>
+        </div>
+        <div class="sum-card">
+          <div class="sum-label">Cocok untuk scalping</div>
+          <div class="sum-value" id="sumScalp">—</div>
+          <div class="sum-sub" id="sumScalpSub">Jalankan Analisa Semua Saham</div>
+        </div>
+      </section>
+
+      <div class="toolbar">
+        <button id="btnNotif">Aktifkan notifikasi</button>
+        <button id="btnAnalyzeAll" class="primary">Analisa Semua Saham</button>
+      </div>
+
+      <div id="aiSummary" class="panel ai-summary"><p class="muted">Belum dianalisa. Tekan "Analisa Semua Saham" untuk menganalisa semua saham di watchlist.</p></div>
+      <div id="aiPanel" class="ai-panel hidden"></div>
+
+      <footer>Data dari Yahoo Finance, bisa delay ~15 menit. Bukan rekomendasi investasi — selalu cek lagi sebelum membeli atau menjual saham.</footer>
+    </main>
+  </div>
+</div>
+
+<script src="ai.js"></script>
+<script>
+const LS = { watch:"idx_watchlist" };
+const $ = s => document.querySelector(s);
+const DEFAULT_WATCH = ["BBCA","BBRI","BMRI","BBNI","TLKM","ASII","GOTO","AMRT"];
+function load(k, d){ try{ const v=JSON.parse(localStorage.getItem(k)); return v??d; }catch(e){ return d; } }
+let watch = load(LS.watch, DEFAULT_WATCH);
+let prices = {};
+let analysis = {};
+
+async function apiQuote(symbols){
+  const r = await fetch("/api/quote?symbols=" + symbols.map(encodeURIComponent).join(","));
+  if(!r.ok) throw new Error("HTTP " + r.status);
+  return r.json();
+}
+async function refreshQuotes(){
+  if(!watch.length) return;
+  try{
+    const data = await apiQuote(watch.map(c=>c+".JK"));
+    data.results.forEach(q=>{ prices[q.symbol]=q; });
+    const mts = data.results.map(q=>q.marketTime).filter(Boolean).map(t=>new Date(t).getTime()).filter(n=>!isNaN(n));
+    const now = new Date();
+    const fmtTime = d => d.toLocaleTimeString("id-ID",{timeZone:"Asia/Jakarta", hour:"2-digit", minute:"2-digit"});
+    if(mts.length){
+      const latest = Math.max(...mts);
+      const delayMin = Math.max(0, Math.round((now.getTime()-latest)/60000));
+      const el = $("#lastUpdate");
+      el.textContent = `Data bursa per ${fmtTime(new Date(latest))} WIB • telat ${delayMin} mnt • dicek ${fmtTime(now)} WIB`;
+      el.style.color = delayMin > 15 ? "#d97706" : "";
+    } else {
+      $("#lastUpdate").textContent = "Terakhir dicek: " + fmtTime(now) + " WIB (jam data bursa tidak tersedia)";
+    }
+  }catch(e){
+    const el=$("#globalError"); el.textContent="Gagal memuat harga: "+e.message+". Coba refresh lagi."; el.classList.remove("hidden");
+  }
+}
+
+function renderAiPanel(code, a){
+  const el=$("#aiPanel");
+  if(!a){ el.classList.add("hidden"); el.innerHTML=""; return; }
+  const cls = a.verdict==="BULLISH" ? "badge-bull" : a.verdict==="BEARISH" ? "badge-bear" : "badge-neutral";
+  const barColor = a.verdict==="BULLISH" ? "#16a34a" : a.verdict==="BEARISH" ? "#dc2626" : "#94a3b8";
+  el.classList.remove("hidden");
+  el.innerHTML = `
+    <h3>Analisa AI — ${code}</h3>
+    <div class="row"><span class="badge ${cls}" style="font-size:14px">${a.verdict}</span><b>Skor ${a.score}/100</b><span>${suggestionBadge(a.suggestion)}</span></div>
+    <div class="scorebar"><i style="width:${a.score}%;background:${barColor}"></i></div>
+    <div class="mini">Tren: ${a.trend} • Momentum: ${a.momentum}</div>
+    <ul>${a.reasons.map(r=>`<li>${r}</li>`).join("")}</ul>
+    <table class="ai-plan">
+      <tr><td>Saran</td><td><b>${a.suggestion}</b></td></tr>
+      <tr><td>Entry</td><td>${a.entry}</td></tr>
+      <tr><td>Stop loss</td><td>${fmtRp(a.stopLoss)}</td></tr>
+      <tr><td>Target 1</td><td>${fmtRp(a.target1)}</td></tr>
+      <tr><td>Target 2</td><td>${fmtRp(a.target2)}</td></tr>
+    </table>
+    <p class="mini" style="margin-top:8px">${a.riskNote}</p>
+    <p class="mini">Analisa rule-based (MA20/MA50, RSI, MACD, support/resistance) dari data Yahoo Finance — bukan rekomendasi investasi dan bukan prediksi pasti.</p>`;
+}
+
+async function analyzeAll(){
+  const btn=$("#btnAnalyzeAll");
+  if(!watch.length){ alert("Watchlist kosong — tambah saham dulu."); return; }
+  btn.disabled=true;
+  const panel=$("#aiSummary");
+  panel.classList.remove("hidden");
+  const rows=[];
+  for(let i=0;i<watch.length;i++){
+    const code=watch[i];
+    btn.textContent=`Menganalisa… ${i+1}/${watch.length} (${code})`;
+    panel.innerHTML=`<b>Analisa Semua</b><p class="muted">Menganalisa ${code} (${i+1}/${watch.length})…</p>`;
+    try{
+      const r=await fetch(`/api/chart?symbol=${code}.JK&range=3mo`);
+      if(!r.ok) throw new Error("HTTP "+r.status);
+      const d=await r.json();
+      const a=analyzeStock(code, d.closes||[], prices[code+".JK"]);
+      analysis[code]=a;
+      const scalp=analyzeScalping(code, d.volumes||[], prices[code+".JK"], a);
+      rows.push({code, a, scalp});
+    }catch(e){ console.warn("analisa gagal", code, e); }
+  }
+  btn.disabled=false; btn.textContent="Analisa Semua Saham";
+  if(!rows.length){ panel.innerHTML="<b>Analisa Semua</b><p class='muted'>Gagal menganalisa semua saham — coba refresh lalu ulangi.</p>"; return; }
+  rows.sort((x,y)=>y.a.score-x.a.score);
+  const bull=rows.filter(r=>r.a.verdict==="BULLISH").length;
+  const bear=rows.filter(r=>r.a.verdict==="BEARISH").length;
+  const net=rows.length-bull-bear;
+  const best=rows[0];
+  // --- 1) Saham yang boleh masuk hari ini (kriteria ketat, jangan dipaksa) ---
+  const bolehMasuk=rows.filter(({a})=>
+    a.verdict==="BULLISH" && a.score>=65
+    && a.rsi!=null && a.rsi>=40 && a.rsi<=65
+    && a.ma20!=null && a.ma50!=null && a.price>a.ma20 && a.price>a.ma50
+    && a.macdHist!=null && a.macdHist>0
+    && (a.changePercent??0)>=0
+  ).sort((x,y)=>y.a.score-x.a.score);
+  // --- 2) Cocok untuk scalping (skor scalping terpisah) ---
+  const scalpers=rows.filter(r=>r.scalp?.eligible).sort((x,y)=>y.scalp.score-x.scalp.score);
+  // --- Kartu ringkasan di atas ---
+  const sm=$("#sumMasuk"), ss=$("#sumScalp");
+  if(sm){ sm.textContent = bolehMasuk.length ? bolehMasuk.length + " saham" : "0 saham"; }
+  const sms=$("#sumMasukSub"); if(sms) sms.textContent = bolehMasuk.length ? bolehMasuk.map(r=>r.code).join(", ") : "Tidak ada yang lolos hari ini";
+  if(ss){ ss.textContent = scalpers.length ? scalpers.length + " saham" : "0 saham"; }
+  const sss=$("#sumScalpSub"); if(sss) sss.textContent = scalpers.length ? scalpers.map(r=>r.code).join(", ") : "Tidak ada yang cocok hari ini";
+  panel.innerHTML = `
+    <b>Analisa Semua — ${rows.length} saham</b>
+    <p class="muted">${bull} bullish, ${net} netral, ${bear} bearish — paling kuat ${best.code} (skor ${best.a.score}, ${best.a.verdict}, saran: ${best.a.suggestion}). Saran "Wait and See (WNS)" = sinyal masih bertentangan/netral, jangan masuk dulu, tunggu konfirmasi tembus resistance/MA20; "Tunggu" = sudah bullish tapi RSI ≥70, tunggu koreksi ke MA20.</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Kode</th><th>Harga</th><th>%</th><th>RSI</th><th>MA20 / MA50</th><th>MACD</th><th>Skor</th><th>Arah</th><th>Saran</th></tr></thead>
+      <tbody>${rows.map(({code,a})=>`<tr>
+        <td><b>${code}</b></td>
+        <td>${fmtRp(a.price)}</td>
+        <td class="${(a.changePercent||0)>=0?"up":"down"}">${fmtPct(a.changePercent)}</td>
+        <td>${a.rsi==null?"—":a.rsi.toFixed(1)}</td>
+        <td>${fmtRp(a.ma20)} / ${fmtRp(a.ma50)}</td>
+        <td>${a.macdHist==null?"—":(a.macdHist>=0?"+":"")+Math.round(a.macdHist)}</td>
+        <td><b>${a.score}</b></td>
+        <td>${verdictBadge(a)}</td>
+        <td>${suggestionBadge(a.suggestion)}</td>
+      </tr>`).join("")}</tbody>
+    </table></div>
+    <h3 style="margin-top:16px">Saham yang boleh masuk hari ini</h3>
+    <p class="mini">Kriteria lolos (semua harus terpenuhi): verdict BULLISH, skor ≥65, RSI 40-65 (tidak overbought), harga di atas MA20 dan MA50, MACD histogram positif, dan % harian tidak negatif. Diurutkan dari skor tertinggi.</p>
+    ${bolehMasuk.length ? `<div class="tablewrap"><table>
+      <thead><tr><th>Kode</th><th>Skor</th><th>RSI</th><th>Entry</th><th>Stop loss</th><th>Target 1</th><th>Target 2</th></tr></thead>
+      <tbody>${bolehMasuk.map(({code,a})=>`<tr>
+        <td><b>${code}</b></td><td><b>${a.score}</b></td><td>${a.rsi.toFixed(1)}</td>
+        <td>${a.entry}</td><td>${fmtRp(a.stopLoss)}</td><td>${fmtRp(a.target1)}</td><td>${fmtRp(a.target2)}</td>
+      </tr>`).join("")}</tbody>
+    </table></div>` : `<p><b>Hari ini tidak ada saham yang lolos kriteria masuk — semua WNS/Hindari.</b> Jangan paksa masuk; tunggu sampai ada saham yang memenuhi semua kriteria di atas.</p>`}
+    <h3 style="margin-top:16px">Cocok untuk scalping</h3>
+    <p class="mini">Kriteria lolos: range harian (high-low)/prev close minimal 1,5%, likuiditas tinggi (volume ≥5 jt lembar dan turnover ≥Rp5 miliar), RSI 45-65, MACD positif, harga di atas MA20. Skor scalping 0-100: range +30, likuiditas +25, RSI +20, MACD +15, di atas MA20 +10. Scalping = trading cepat dalam sehari: pakai stop loss ketat, jangan tahan lama, dan jangan kejar harga.</p>
+    ${scalpers.length ? `<div class="tablewrap"><table>
+      <thead><tr><th>Kode</th><th>Range harian</th><th>Volume</th><th>RSI</th><th>Skor scalping</th><th>Catatan</th></tr></thead>
+      <tbody>${scalpers.map(({code,a,scalp})=>`<tr>
+        <td><b>${code}</b></td>
+        <td>${scalp.rangePct==null?"—":scalp.rangePct.toFixed(1)+"%"}</td>
+        <td>${fmtVol(scalp.volume)}<br><span class="muted">turnover ${fmtTurn(scalp.turnover)}</span></td>
+        <td>${a.rsi==null?"—":a.rsi.toFixed(1)}</td>
+        <td><b>${scalp.score}</b></td>
+        <td style="min-width:260px">${scalp.note}</td>
+      </tr>`).join("")}</tbody>
+    </table></div>` : `<p><b>Hari ini tidak ada saham yang cocok untuk scalping.</b> Range harian terlalu kecil, likuiditas kurang, atau RSI/MACD tidak mendukung — lebih aman tidak scalping hari ini.</p>`}
+    <p class="mini">Klik baris saham di tabel ringkasan untuk melihat alasan detail + rencana entry di panel Analisa AI di bawah. Semua analisa di atas rule-based dari data Yahoo Finance (delay ~10-15 menit) — bukan rekomendasi investasi dan bukan prediksi pasti.</p>`;
+  // Klik baris di tabel ringkasan -> panel analisa per saham di bawah
+  panel.querySelectorAll(".tablewrap table tbody tr").forEach(tr=>{
+    tr.style.cursor="pointer";
+    tr.addEventListener("click", ()=>openDetailAI(tr.querySelector("td b")?.textContent?.trim()));
+  });
+}
+
+async function openDetailAI(code){
+  if(!code) return;
+  const el=$("#aiPanel");
+  el.classList.remove("hidden");
+  el.innerHTML="<p class='muted'>Memuat analisa "+code+"…</p>";
+  try{
+    const r=await fetch(`/api/chart?symbol=${code}.JK&range=3mo`);
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const d=await r.json();
+    const a=analyzeStock(code, d.closes||[], prices[code+".JK"]);
+    analysis[code]=a;
+    renderAiPanel(code, a);
+    el.scrollIntoView({behavior:"smooth"});
+  }catch(e){ el.innerHTML="<p class='muted'>Gagal memuat analisa "+code+": "+e.message+"</p>"; }
+}
+$("#btnAnalyzeAll").addEventListener("click", analyzeAll);
+$("#btnRefresh").addEventListener("click", async ()=>{ await refreshQuotes(); if(Object.keys(analysis).length) analyzeAll(); });
+$("#btnNotif").addEventListener("click", async ()=>{
+  if(!("Notification" in window)) return alert("Browser ini tidak mendukung notifikasi.");
+  const p = await Notification.requestPermission();
+  alert(p==="granted" ? "Notifikasi diaktifkan." : "Notifikasi: "+p);
+});
+$("#topSearch").addEventListener("input", e=>{
+  const term=(e.target.value||"").trim().toUpperCase();
+  document.querySelectorAll("#aiSummary tbody tr").forEach(tr=>{
+    tr.style.display = !term || tr.textContent.toUpperCase().includes(term) ? "" : "none";
+  });
+});
+
+(async ()=>{ await refreshQuotes(); if(watch.length) analyzeAll(); })();
+setInterval(async ()=>{ await refreshQuotes(); }, 60000);
+</script>
+</body>
+</html>

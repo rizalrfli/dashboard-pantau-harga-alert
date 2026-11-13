@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="id" data-type="software">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Masuk — Screener AI</title>
+<meta name="description" content="Masuk ke dashboard Pantau Saham IDX.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="auth.js"></script>
+<style>
+  :root{
+    --bg:#f6f7f8; --panel:#ffffff; --surface:#f8fafc; --line:#e3e6ea; --line-strong:#d1d5db;
+    --text:#111827; --muted:#5b6470;
+    --red:#b91c1c; --green:#15803d;
+    --orange:#ff7a1a; --action:#c2410c; --action-hover:#9a3412;
+    --r-lg:12px; --r-md:8px;
+    --shadow:0 1px 2px rgba(16,24,40,.06);
+    --shadow-lift:0 4px 12px rgba(16,24,40,.10);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    font-size:16px;line-height:1.5;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
+  :focus-visible{outline:2px solid var(--action);outline-offset:2px;border-radius:6px}
+  .login-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow-lift);padding:32px 28px;width:100%;max-width:400px}
+  .logo{display:flex;gap:10px;align-items:center;margin-bottom:24px}
+  .logo-mark{width:38px;height:38px;border-radius:8px;background:var(--orange);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+  .logo b{display:block;font-size:17px}
+  .logo span{display:block;font-size:12px;color:var(--muted)}
+  h1{font-size:20px;line-height:1.3;margin:0 0 4px;font-weight:600}
+  .sub{color:var(--muted);font-size:14px;margin:0 0 24px}
+  label{font-size:13px;color:var(--muted);display:block;margin-bottom:4px}
+  input{width:100%;background:#fff;color:var(--text);border:1px solid var(--line-strong);border-radius:8px;padding:9px 12px;font:inherit;font-size:15px;min-height:44px}
+  button{width:100%;cursor:pointer;background:var(--action);color:#fff;border:1px solid var(--action);border-radius:8px;padding:9px 12px;font:inherit;font-size:15px;font-weight:500;min-height:44px;margin-top:16px}
+  button:hover{background:var(--action-hover);border-color:var(--action-hover)}
+  button.secondary{background:#fff;color:var(--text);border-color:var(--line-strong)}
+  button.secondary:hover{border-color:var(--text)}
+  .err{background:var(--panel);border:1px solid var(--red);color:var(--red);padding:10px;border-radius:8px;margin:0 0 16px;font-size:14px}
+  .ok{background:var(--panel);border:1px solid var(--green);color:var(--green);padding:10px;border-radius:8px;margin:0 0 16px;font-size:14px}
+  .hidden{display:none!important}
+  .change{margin-top:24px;border-top:1px solid var(--line);padding-top:16px}
+  .change summary{cursor:pointer;color:var(--muted);font-size:14px;min-height:44px;display:flex;align-items:center}
+  .change .field{margin-top:12px}
+  .hash-out{width:100%;font-size:13px;word-break:break-all;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px;margin-top:12px}
+  .note{font-size:13px;color:var(--muted);margin-top:12px}
+  footer{color:var(--muted);font-size:13px;margin-top:24px;text-align:center}
+</style>
+</head>
+<body>
+<main class="login-card">
+  <div class="logo"><span class="logo-mark">S</span><div><b>Screener AI</b><span>Pantau Saham IDX</span></div></div>
+  <h1>Masuk ke dashboard</h1>
+  <p class="sub">Halaman ini dikunci — masukkan password untuk melanjutkan.</p>
+
+  <p id="loginError" class="err hidden">Password salah. Coba lagi.</p>
+  <form id="loginForm">
+    <label for="password">Password</label>
+    <input id="password" type="password" autocomplete="current-password" autofocus>
+    <button type="submit">Masuk</button>
+  </form>
+
+  <details class="change">
+    <summary>Ganti password</summary>
+    <p id="changeError" class="err hidden">Password lama salah.</p>
+    <p id="changeOk" class="ok hidden">Hash baru dibuat. Tempel hash di bawah ke <b>PASSWORD_HASH</b> di <b>auth.js</b>, lalu push ulang ke GitHub — password baru aktif setelah Vercel redeploy.</p>
+    <form id="changeForm">
+      <div class="field"><label for="oldPass">Password lama</label><input id="oldPass" type="password" autocomplete="current-password"></div>
+      <div class="field"><label for="newPass">Password baru</label><input id="newPass" type="password" autocomplete="new-password"></div>
+      <button type="submit" class="secondary">Buat hash baru</button>
+    </form>
+    <div id="hashOut" class="hash-out hidden"></div>
+    <button id="copyHash" type="button" class="secondary hidden">Salin hash</button>
+    <p class="note">Yang ditampilkan hanya hash SHA-256, bukan passwordnya. Hash lama di auth.js tetap berlaku sampai kamu menggantinya dan redeploy.</p>
+  </details>
+
+  <footer>Data dari Yahoo Finance, bisa delay ~15 menit. Bukan rekomendasi investasi.</footer>
+</main>
+
+<script>
+(function () {
+  var params = new URLSearchParams(location.search);
+  var next = params.get("next") || "index.html";
+  // Hanya izinkan redirect internal, jangan ke situs lain.
+  if (!/^(index\.html|analisa\.html)/.test(next)) next = "index.html";
+
+  // Kalau sudah login, langsung lanjut — tidak perlu login dua kali.
+  if (isLoggedIn()) { location.replace(next); return; }
+
+  document.getElementById("loginForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var pw = document.getElementById("password").value;
+    if (pw && sha256Hex(pw) === PASSWORD_HASH) {
+      try { sessionStorage.setItem(SESSION_KEY, "1"); } catch (err) {}
+      location.replace(next);
+    } else {
+      document.getElementById("loginError").classList.remove("hidden");
+      document.getElementById("password").value = "";
+      document.getElementById("password").focus();
+    }
+  });
+
+  document.getElementById("changeForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var oldPw = document.getElementById("oldPass").value;
+    var newPw = document.getElementById("newPass").value;
+    var errEl = document.getElementById("changeError");
+    var okEl = document.getElementById("changeOk");
+    errEl.classList.add("hidden"); okEl.classList.add("hidden");
+    if (!oldPw || sha256Hex(oldPw) !== PASSWORD_HASH) {
+      errEl.classList.remove("hidden");
+      return;
+    }
+    if (!newPw || newPw.length < 4) {
+      errEl.textContent = "Password baru minimal 4 karakter — pakai yang lebih panjang supaya aman.";
+      errEl.classList.remove("hidden");
+      return;
+    }
+    var hash = sha256Hex(newPw);
+    var out = document.getElementById("hashOut");
+    out.textContent = hash;
+    out.classList.remove("hidden");
+    document.getElementById("copyHash").classList.remove("hidden");
+    okEl.classList.remove("hidden");
+    document.getElementById("newPass").value = "";
+    document.getElementById("oldPass").value = "";
+  });
+
+  document.getElementById("copyHash").addEventListener("click", function () {
+    var hash = document.getElementById("hashOut").textContent;
+    if (navigator.clipboard) navigator.clipboard.writeText(hash);
+  });
+})();
+</script>
+</body>
+</html>
