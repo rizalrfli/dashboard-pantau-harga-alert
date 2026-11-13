@@ -250,6 +250,145 @@ export function analyzeScalping(code, volumes, quote, ai){
   }
   return {eligible, score, rangePct, volume, avgVolume, turnover, note:parts.join(" ")};
 }
+// ---- Rekomendasi swing / hold 1-3 bulan (price-based, rule-based) ----
+// Horizon menengah: tren 3 bulan + posisi terhadap MA50/MA20 + momentum
+// + kualitas entry (pullback/breakout). TIDAK memakai fundamental
+// (PER/PBV/laba/dividen) karena data itu tidak tersedia di proyek ini —
+// hanya harga penutupan Yahoo Finance yang ada. Skor swing BUKAN prediksi
+// pasti; horizon 1-3 bulan adalah perkiraan dari arah tren, bukan janji.
+// SKOR SWING 0-100:
+//   Uptrend +40  : harga di atas MA50 (+15), MA20 di atas MA50 (+15), harga di atas MA20 (+10).
+//                  Bila MA50 belum ada: harga di atas MA20 +25, di bawah +5.
+//   Momentum +25 : MACD histogram positif (+12), RSI 40-65 (+13) / 65-70 (+6) / <40 (+4) / >=70 (+3).
+//   Kualitas entry +20: pullback — harga 0-5% di atas MA20 (+20) atau dekat support (+15);
+//                  breakout di atas resistance (+18); 5-10% di atas MA20 (+10);
+//                  10-15% di atas MA20 (+5); >15% di atas MA20 (+2, sudah terlalu jauh);
+//                  di bawah MA20 (0).
+//   Tren 3 bulan +15: harga vs 3 bulan lalu: >=+10% (+15), +5-10% (+12), 0-5% (+8),
+//                  -5-0% (+4), <-5% (0). Bila data 3 bulan tidak tersedia (mis. hasil
+//                  cache scan 911 yang tidak menyimpan closes), pakai skor analisa
+//                  utama sebagai proksi (+10/+6/+2) dan alasannya menyebut itu.
+// Klasifikasi:
+//   SWING   (skor >=65): uptrend + entry bagus — layak dibeli untuk dipegang 1-3 bulan.
+//   HOLD    (skor 55-64, ATAU uptrend kuat tapi harga sudah jauh di atas MA50 dan RSI 50-70):
+//           yang sudah punya = pegang 1-3 bulan; yang belum punya = tunggu pullback ke MA20.
+//   TUNGGU  (skor 40-54): tren belum terkonfirmasi, jangan masuk dulu.
+//   HINDARI (skor <40): downtrend / harga di bawah MA50.
+// Entry/SL/target: SWING masuk di area pullback/breakout, SL di bawah MA20/support
+// (~5-8%), target resistance terdekat atau +10-15%. HOLD: target +8-12% dari harga.
+// Bila closes tidak diberikan (cache), tren 3 bulan dihitung dari proksi skor.
+export function analyzeSwing(code, closes, quote, ai){
+  const a = ai ?? analyzeStock(code, closes || [], quote);
+  const price = a?.price ?? quote?.price ?? null;
+  const ma20 = a?.ma20 ?? null, ma50 = a?.ma50 ?? null;
+  const rsiVal = a?.rsi ?? null, macdHist = a?.macdHist ?? null;
+  const support = a?.support ?? null, resistance = a?.resistance ?? null;
+  const valid = (closes || []).filter(v => v != null);
+  const hasCloses = valid.length > 0;
+  const trend3mPct = (hasCloses && valid.length >= 50 && valid[0])
+    ? (price - valid[0]) / valid[0] * 100 : null;
+  const pullbackPct = (ma20 != null && price != null) ? (price - ma20) / ma20 * 100 : null;
+  const base = { code, price, ma20, ma50, rsi: rsiVal, macdHist, support, resistance, trend3mPct, pullbackPct, horizon: "1-3 bulan" };
+  // Data belum cukup: MA20/RSI/MACD belum bisa diandalkan — jangan dipaksa
+  // jadi SWING/HOLD, hasilnya TUNGGU (sama seperti fallback WNS di analyzeStock).
+  if(price == null || (hasCloses && valid.length < 20) || (!hasCloses && ma20 == null && ma50 == null)){
+    return { ...base, swingScore: 50, classification: "TUNGGU",
+      entry: "Pantau dulu — data belum cukup",
+      stopLoss: null, target: null, target2: null,
+      reasons: [`Data hanya ${hasCloses ? valid.length : 0} hari bursa — MA20/RSI/MACD belum bisa diandalkan untuk horizon 1-3 bulan.`] };
+  }
+  // --- Skor: uptrend (max 40) ---
+  let trendScore = 0;
+  if(ma50 != null){
+    if(price > ma50) trendScore += 15;
+    if(ma20 != null && ma20 > ma50) trendScore += 15;
+    if(ma20 != null && price > ma20) trendScore += 10;
+  } else if(ma20 != null){
+    trendScore += price > ma20 ? 25 : 5;
+  }
+  // --- Skor: momentum (max 25) ---
+  let momScore = 0;
+  if(macdHist != null && macdHist > 0) momScore += 12;
+  if(rsiVal != null){
+    momScore += (rsiVal >= 40 && rsiVal <= 65) ? 13 : (rsiVal > 65 && rsiVal < 70) ? 6 : (rsiVal < 40) ? 4 : 3;
+  }
+  // --- Skor: kualitas entry (max 20) ---
+  let entryScore = 0, entryKind = "bawah";
+  if(resistance != null && price >= resistance){ entryScore = 18; entryKind = "breakout"; }
+  else if(pullbackPct != null && pullbackPct >= 0 && pullbackPct <= 5){ entryScore = 20; entryKind = "pullback"; }
+  else if(support != null && (price - support) / price <= 0.03){ entryScore = 15; entryKind = "support"; }
+  else if(pullbackPct != null && pullbackPct > 5 && pullbackPct <= 10){ entryScore = 10; entryKind = "dekat"; }
+  else if(pullbackPct != null && pullbackPct > 10 && pullbackPct <= 15){ entryScore = 5; entryKind = "jauh"; }
+  else if(pullbackPct != null && pullbackPct > 15){ entryScore = 2; entryKind = "jauh"; }
+  // --- Skor: tren 3 bulan (max 15) ---
+  let t3Score = 0;
+  if(trend3mPct != null){
+    t3Score = trend3mPct >= 10 ? 15 : trend3mPct >= 5 ? 12 : trend3mPct >= 0 ? 8 : trend3mPct >= -5 ? 4 : 0;
+  } else {
+    t3Score = a.score >= 65 ? 10 : a.score >= 50 ? 6 : 2; // proksi dari skor analisa utama
+  }
+  const swingScore = Math.max(0, Math.min(100, Math.round(trendScore + momScore + entryScore + t3Score)));
+  // --- Klasifikasi ---
+  const extended = ma50 != null && price > ma50 * 1.10 && rsiVal != null && rsiVal >= 50 && rsiVal <= 70
+    && macdHist != null && macdHist > 0;
+  let classification;
+  if(swingScore >= 65) classification = "SWING";
+  else if(swingScore >= 55 || extended) classification = "HOLD";
+  else if(swingScore >= 40) classification = "TUNGGU";
+  else classification = "HINDARI";
+  // --- Stop loss: di bawah MA20/support, 5-8% di bawah harga ---
+  let stopLoss = null;
+  if(support != null && support < price * 0.97 && (price - support) / price <= 0.08) stopLoss = Math.round(support);
+  else if(ma20 != null && ma20 * 0.95 < price * 0.97) stopLoss = Math.round(ma20 * 0.95);
+  else stopLoss = Math.round(price * 0.95);
+  // --- Entry / target ---
+  let entry, target, target2;
+  if(classification === "SWING"){
+    if(entryKind === "breakout") entry = `Beli di ${fmtRp(price)} (baru tembus resistance ${fmtRp(resistance)})`;
+    else if(entryKind === "pullback") entry = `Beli di ${fmtRp(price)} (pullback ke MA20 ${fmtRp(ma20)})`;
+    else if(entryKind === "support") entry = `Beli di ${fmtRp(price)} (dekat support ${fmtRp(support)})`;
+    else entry = `Tunggu pullback ke MA20 ${fmtRp(ma20)} — harga sekarang ${fmtRp(price)} sudah ${pullbackPct != null ? pullbackPct.toFixed(0) + "% di atas MA20" : "jauh dari MA20"}`;
+    target = (resistance != null && resistance > price) ? Math.round(resistance) : Math.round(price * 1.12);
+    target2 = Math.round(price * 1.15);
+  } else if(classification === "HOLD"){
+    entry = `Sudah punya: pegang 1-3 bulan. Belum punya: tunggu pullback ke MA20 ${fmtRp(ma20)}`;
+    target = Math.round(price * 1.08);
+    target2 = Math.round(price * 1.12);
+  } else if(classification === "TUNGGU"){
+    entry = `Pantau dulu — masuk bila harga bertahan di atas MA50 ${fmtRp(ma50)}`;
+    target = null; target2 = null;
+  } else {
+    entry = "— (jangan masuk dulu)";
+    target = null; target2 = null;
+  }
+  if(classification === "TUNGGU" || classification === "HINDARI") stopLoss = null;
+  // --- Alasan (Bahasa Indonesia, 2-3 kalimat pendek, menyebut angka sebenarnya) ---
+  const reasons = [];
+  if(ma50 != null){
+    reasons.push(price > ma50
+      ? `Harga di atas MA50 — tren naik${trend3mPct != null ? `, ${trend3mPct >= 0 ? "+" : ""}${trend3mPct.toFixed(1)}% dalam 3 bulan` : ""}.`
+      : `Harga di bawah MA50 — tren turun${trend3mPct != null ? `, ${trend3mPct.toFixed(1)}% dalam 3 bulan` : ""}.`);
+  } else if(ma20 != null){
+    reasons.push(`Harga ${price > ma20 ? "di atas" : "di bawah"} MA20 (MA50 belum tersedia).`);
+  }
+  if(entryKind === "pullback") reasons.push(`Pullback ke MA20 ${fmtRp(ma20)} — area beli yang sehat, bukan kejar harga.`);
+  else if(entryKind === "breakout") reasons.push(`Baru tembus resistance ${fmtRp(resistance)} — breakout terkonfirmasi.`);
+  else if(entryKind === "support") reasons.push(`Harga dekat support ${fmtRp(support)} — risiko terbatas.`);
+  else if(entryKind === "dekat" || entryKind === "jauh") reasons.push(`Harga ${pullbackPct != null ? pullbackPct.toFixed(0) + "% di atas MA20" : "jauh di atas MA20"} — ${entryKind === "jauh" ? "sudah terlalu jauh, tunggu pullback." : "masih wajar, tapi jangan kejar harga."}`);
+  else reasons.push(`Harga di bawah MA20 ${fmtRp(ma20)} — tren jangka menengah belum mendukung.`);
+  if(macdHist != null || rsiVal != null){
+    const mom = [];
+    if(macdHist != null) mom.push(`MACD ${macdHist > 0 ? "positif" : "negatif"}`);
+    if(rsiVal != null) mom.push(`RSI ${rsiVal.toFixed(1)}${rsiVal >= 70 ? " (overbought)" : rsiVal > 65 ? " (mulai panas)" : rsiVal >= 40 ? " (zona sehat)" : rsiVal >= 30 ? " (lemah, dekat oversold)" : " (oversold)"}`);
+    reasons.push(mom.join(", ") + " — momentum " + ((macdHist != null && macdHist > 0 && rsiVal != null && rsiVal >= 40 && rsiVal <= 65) ? "mendukung swing." : "belum ideal untuk swing."));
+  }
+  if(trend3mPct == null) reasons.push("Tren 3 bulan dihitung dari proksi skor (data harga 3 bulan tidak tersedia di cache).");
+  return { ...base, swingScore, classification, entry, stopLoss, target, target2, reasons };
+}
+export function swingBadge(s){
+  const cls = s === "SWING" ? "badge-bull" : s === "HINDARI" ? "badge-bear" : s === "TUNGGU" ? "badge-wns" : "badge-neutral";
+  return `<span class="badge ${cls}">${s}</span>`;
+}
 export const fmtVol = n => n==null ? "—" : (n>=1000000 ? (n/1000000).toFixed(1)+" jt" : Math.round(n).toLocaleString("id-ID"));
 export const fmtTurn = n => n==null ? "—" : "Rp" + (n>=1000000000 ? (n/1000000000).toFixed(1)+" M" : Math.round(n).toLocaleString("id-ID"));
 export function verdictBadge(a){

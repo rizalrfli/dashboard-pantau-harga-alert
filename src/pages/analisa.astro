@@ -11,7 +11,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 
       <div class="page-head">
         <h1>Analisa AI</h1>
-        <div class="sub">Analisa rule-based semua saham di watchlist — arah bull/bear, saran masuk, dan scalping. Data Yahoo Finance, refresh otomatis 60 detik.</div>
+        <div class="sub">Analisa rule-based semua saham di watchlist — arah bull/bear, saran masuk, scalping, dan rekomendasi swing &amp; hold 1-3 bulan. Data Yahoo Finance, refresh otomatis 60 detik.</div>
         <div id="lastUpdate" class="sub"></div>
       </div>
       <div id="globalError" class="err hidden"></div>
@@ -26,6 +26,11 @@ import BaseLayout from "../layouts/BaseLayout.astro";
           <div class="sum-label">Cocok untuk scalping</div>
           <div class="sum-value" id="sumScalp">—</div>
           <div class="sum-sub" id="sumScalpSub">Jalankan Analisa Semua Saham</div>
+        </div>
+        <div class="sum-card">
+          <div class="sum-label">Swing &amp; hold 1-3 bln</div>
+          <div class="sum-value" id="sumSwing">—</div>
+          <div class="sum-sub" id="sumSwingSub">Jalankan Analisa Semua Saham</div>
         </div>
       </section>
 
@@ -63,7 +68,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 </BaseLayout>
 
 <script>
-import { fmtRp, fmtPct, analyzeStock, analyzeScalping, fmtVol, fmtTurn, verdictBadge, suggestionBadge } from "../lib/ai.js";
+import { fmtRp, fmtPct, analyzeStock, analyzeScalping, analyzeSwing, fmtVol, fmtTurn, verdictBadge, suggestionBadge, swingBadge } from "../lib/ai.js";
 import { stockLogoHTML } from "../lib/logos.js";
 import { renderAiPanel } from "../lib/analysisPanel.js";
 import { IDX_TICKERS } from "../lib/tickers.js";
@@ -104,6 +109,31 @@ async function refreshQuotes(){
 }
 
 
+// --- HTML daftar swing & hold (dipakai watchlist dan hasil scan 911) ---
+// scope: label sumbernya, mis. "watchlist" atau "dari 911 saham".
+function swingSectionHTML(swingList, holdList, scope){
+  const row = ({code, swing}) => `<tr>
+    <td><span style="display:flex;gap:8px;align-items:center">${stockLogoHTML(code, 28)}<b>${code}</b></span></td>
+    <td><b>${swing.swingScore}</b></td>
+    <td>${fmtRp(swing.price)}</td>
+    <td style="min-width:220px">${swing.entry}</td>
+    <td>${swing.stopLoss == null ? "—" : fmtRp(swing.stopLoss)}</td>
+    <td>${swing.target == null ? "—" : fmtRp(swing.target)}${swing.target2 != null ? `<br><span class="muted">target 2: ${fmtRp(swing.target2)}</span>` : ""}</td>
+    <td style="min-width:260px">${swing.reasons.join(" ")}</td>
+  </tr>`;
+  const table = (list) => `<div class="tablewrap"><table>
+    <thead><tr><th>Kode</th><th>Skor swing</th><th>Harga</th><th>Entry</th><th>Stop loss</th><th>Target</th><th>Alasan</th></tr></thead>
+    <tbody>${list.map(row).join("")}</tbody>
+  </table></div>`;
+  return `
+    <h3 style="margin-top:16px">Rekomendasi Swing &amp; Hold (1-3 Bulan) — ${scope}</h3>
+    <p class="mini">Sinyal berbasis harga &amp; tren (rule-based), bukan saran keuangan — cek fundamental emiten sebelum beli, dan sesuaikan dengan profil risikomu. Klasifikasi: <b>SWING</b> (skor ≥65: uptrend + entry bagus, layak dibeli untuk dipegang 1-3 bulan), <b>HOLD</b> (skor 55-64 atau uptrend kuat tapi harga sudah jauh di atas MA50: yang sudah punya = pegang 1-3 bulan, yang belum punya = tunggu pullback ke MA20), <b>TUNGGU</b> (skor 40-54: tren belum terkonfirmasi), <b>HINDARI</b> (skor &lt;40: downtrend). Stop loss ~5-8% di bawah harga, target swing +10-15%, target hold +8-12%.</p>
+    <h4 style="margin-top:12px">Swing — beli sekarang / di pullback (${swingList.length})</h4>
+    ${swingList.length ? table(swingList) : `<p><b>Tidak ada saham yang lolos kriteria swing.</b> Tunggu sampai ada saham dengan uptrend terkonfirmasi + entry bagus (pullback ke MA20 atau breakout resistance).</p>`}
+    <h4 style="margin-top:12px">Hold — pegang 1-3 bulan (${holdList.length})</h4>
+    ${holdList.length ? table(holdList) : `<p><b>Tidak ada saham yang masuk kategori hold.</b> Saham yang sudah naik jauh tapi trennya masih kuat akan muncul di sini.</p>`}`;
+}
+
 async function analyzeAll(){
   const btn=$("#btnAnalyzeAll");
   if(!watch.length){ alert("Watchlist kosong — tambah saham dulu."); return; }
@@ -122,7 +152,8 @@ async function analyzeAll(){
       const a=analyzeStock(code, d.closes||[], prices[code+".JK"]);
       analysis[code]=a;
       const scalp=analyzeScalping(code, d.volumes||[], prices[code+".JK"], a);
-      rows.push({code, a, scalp});
+      const swing=analyzeSwing(code, d.closes||[], prices[code+".JK"], a);
+      rows.push({code, a, scalp, swing});
     }catch(e){ console.warn("analisa gagal", code, e); }
   }
   btn.disabled=false; btn.textContent="Analisa Semua Saham";
@@ -142,12 +173,17 @@ async function analyzeAll(){
   ).sort((x,y)=>y.a.score-x.a.score);
   // --- 2) Cocok untuk scalping (skor scalping terpisah) ---
   const scalpers=rows.filter(r=>r.scalp?.eligible).sort((x,y)=>y.scalp.score-x.scalp.score);
+  // --- 3) Rekomendasi swing & hold 1-3 bulan ---
+  const swingList=rows.filter(r=>r.swing?.classification==="SWING").sort((x,y)=>y.swing.swingScore-x.swing.swingScore);
+  const holdList=rows.filter(r=>r.swing?.classification==="HOLD").sort((x,y)=>y.swing.swingScore-x.swing.swingScore);
   // --- Kartu ringkasan di atas ---
   const sm=$("#sumMasuk"), ss=$("#sumScalp");
   if(sm){ sm.textContent = bolehMasuk.length ? bolehMasuk.length + " saham" : "0 saham"; }
   const sms=$("#sumMasukSub"); if(sms) sms.textContent = bolehMasuk.length ? bolehMasuk.map(r=>r.code).join(", ") : "Tidak ada yang lolos hari ini";
   if(ss){ ss.textContent = scalpers.length ? scalpers.length + " saham" : "0 saham"; }
   const sss=$("#sumScalpSub"); if(sss) sss.textContent = scalpers.length ? scalpers.map(r=>r.code).join(", ") : "Tidak ada yang cocok hari ini";
+  const sw=$("#sumSwing"); if(sw){ sw.textContent = (swingList.length+holdList.length) ? (swingList.length+holdList.length) + " saham" : "0 saham"; }
+  const sws=$("#sumSwingSub"); if(sws) sws.textContent = (swingList.length||holdList.length) ? [...swingList.map(r=>r.code+" (swing)"), ...holdList.map(r=>r.code+" (hold)")].join(", ") : "Tidak ada rekomendasi swing/hold";
   panel.innerHTML = `
     <b>Analisa Semua — ${rows.length} saham</b>
     <p class="muted">${bull} bullish, ${net} netral, ${bear} bearish — paling kuat ${best.code} (skor ${best.a.score}, ${best.a.verdict}, saran: ${best.a.suggestion}). Saran "Wait and See (WNS)" = sinyal masih bertentangan/netral, jangan masuk dulu, tunggu konfirmasi tembus resistance/MA20; "Tunggu" = sudah bullish tapi RSI ≥70, tunggu koreksi ke MA20.</p>
@@ -187,6 +223,7 @@ async function analyzeAll(){
         <td style="min-width:260px">${scalp.note}</td>
       </tr>`).join("")}</tbody>
     </table></div>` : `<p><b>Hari ini tidak ada saham yang cocok untuk scalping.</b> Range harian terlalu kecil, likuiditas kurang, atau RSI/MACD tidak mendukung — lebih aman tidak scalping hari ini.</p>`}
+    ${swingSectionHTML(swingList, holdList, "watchlist")}
     <p class="mini">Klik baris saham di tabel ringkasan untuk melihat alasan detail + rencana entry di panel Analisa AI di bawah. Semua analisa di atas rule-based dari data Yahoo Finance (delay ~10-15 menit) — bukan rekomendasi investasi dan bukan prediksi pasti.</p>`;
   // Klik baris di tabel ringkasan -> panel analisa per saham di bawah
   panel.querySelectorAll(".tablewrap table tbody tr").forEach(tr=>{
@@ -237,6 +274,13 @@ function loadScan911Cache(){
   }catch(e){}
   return null;
 }
+// Cache lama (sebelum fitur swing) tidak menyimpan swing — hitung dari
+// hasil analisa yang tersimpan (tanpa closes: tren 3 bulan pakai proksi skor).
+function backfillSwing911(){
+  for(const r of scan911Results){
+    if(!r.swing && r.a) r.swing = analyzeSwing(r.code, null, null, r.a);
+  }
+}
 // Cache disimpan ringkas (tanpa reasons/riskNote — panel detail per saham
 // menghitung ulang dari data segar saat baris diklik) supaya 911 hasil
 // muat di localStorage.
@@ -244,9 +288,9 @@ function saveScan911Cache(){
   try{
     localStorage.setItem(SCAN911.cacheKey, JSON.stringify({
       date: scan911TodayKey(), scannedAt: new Date().toISOString(),
-      results: scan911Results.map(({code, a, scalp})=>{
+      results: scan911Results.map(({code, a, scalp, swing})=>{
         const {reasons, riskNote, ...rest} = a || {};
-        return { code, a: rest, scalp };
+        return { code, a: rest, scalp, swing };
       }),
       skipped: scan911Skipped, total: IDX_TICKERS.length
     }));
@@ -320,6 +364,10 @@ function renderScan911(){
   const filtered = scan911Results.filter(r => filter === "ALL" || r.a.verdict === filter);
   const bolehMasuk911 = scan911Results.filter(({a}) => isDailyEntry911(a)).sort((x, y) => y.a.score - x.a.score);
   const scalpers911 = scan911Results.filter(r => r.scalp?.eligible).sort((x, y) => y.scalp.score - x.scalp.score);
+  // Swing & hold dari 911 saham (fallback: hitung dari hasil analisa tersimpan bila cache lama belum punya swing).
+  const withSwing911 = scan911Results.map(r => ({ ...r, swing: r.swing || (r.a ? analyzeSwing(r.code, null, null, r.a) : null) }));
+  const swing911 = withSwing911.filter(r => r.swing?.classification === "SWING").sort((x, y) => y.swing.swingScore - x.swing.swingScore);
+  const hold911 = withSwing911.filter(r => r.swing?.classification === "HOLD").sort((x, y) => y.swing.swingScore - x.swing.swingScore);
   const shown = filtered.slice(0, 200);
   el.innerHTML = `
     <b>Analisa 911 Saham — ${scan911Results.length} saham</b>
@@ -362,6 +410,7 @@ function renderScan911(){
         <td style="min-width:260px">${scalp.note}</td>
       </tr>`).join("")}</tbody>
     </table></div>` : `<p><b>Dari 911 saham, hari ini tidak ada yang cocok untuk scalping.</b> Range harian terlalu kecil, likuiditas kurang, atau RSI/MACD tidak mendukung — lebih aman tidak scalping hari ini.</p>`}
+    ${swingSectionHTML(swing911, hold911, "dari 911 saham")}
     <p class="mini">Klik baris saham untuk melihat alasan detail + rencana entry di panel Analisa AI. Semua analisa di atas rule-based dari data Yahoo Finance (delay ~10-15 menit) — bukan rekomendasi investasi dan bukan prediksi pasti.</p>`;
   const f = $("#scan911Filter");
   if(f){ f.value = filter; f.addEventListener("change", renderScan911); }
@@ -378,6 +427,7 @@ async function runScan911(force, onlyCodes){
     const c = loadScan911Cache();
     if(c){ // hasil hari ini sudah ada: tampilkan, jangan scan ulang otomatis
       scan911Results = c.results; scan911Skipped = c.skipped || []; scan911Done = c.total;
+      backfillSwing911();
       renderScan911();
       $("#btnScan911").textContent = "Scan Ulang 911 Saham";
       return;
@@ -411,7 +461,8 @@ async function runScan911(force, onlyCodes){
           volume: lastVol, dayHigh: null, dayLow: null };
         const a = analyzeStock(code, d.closes || [], quote);
         const scalp = analyzeScalping(code, d.volumes || [], quote, a);
-        return { ok: true, code, a, scalp };
+        const swing = analyzeSwing(code, d.closes || [], quote, a);
+        return { ok: true, code, a, scalp, swing };
       }catch(e){ return { ok: false, code }; }
     }));
     for(const r of settled){
@@ -460,7 +511,7 @@ $("#btnRetry911").addEventListener("click", ()=>{ if(scan911Skipped.length) runS
 // Muat hasil scan 911 hari ini bila ada; kalau belum ada, tampilkan empty state.
 (function initScan911(){
   const c = loadScan911Cache();
-  if(c){ scan911Results = c.results; scan911Skipped = c.skipped || []; scan911Done = c.total; renderScan911(); $("#btnScan911").textContent = "Scan Ulang 911 Saham"; }
+  if(c){ scan911Results = c.results; scan911Skipped = c.skipped || []; scan911Done = c.total; backfillSwing911(); renderScan911(); $("#btnScan911").textContent = "Scan Ulang 911 Saham"; }
 })();
 
 (async ()=>{ await refreshQuotes(); if(watch.length) analyzeAll(); })();
