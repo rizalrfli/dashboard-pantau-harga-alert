@@ -1,0 +1,172 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout
+  title="Swing & Hold — Screener AI"
+  description="Rekomendasi saham swing & hold 1-3 bulan dari watchlist dan seluruh 911 saham IDX: entry, stop loss, dan target."
+  active="swing"
+  searchPlaceholder="Cari kode saham…"
+>
+
+      <div class="page-head">
+        <h1>Swing &amp; Hold</h1>
+        <div class="sub">Rekomendasi saham untuk dipegang 1-3 bulan — tren naik, entry di pullback atau breakout, lengkap dengan stop loss dan target. Isinya sama seperti bagian swing di halaman Analisa AI, hanya saja di sini tampil langsung. Data Yahoo Finance, refresh otomatis 60 detik.</div>
+        <div id="lastUpdate" class="sub"></div>
+      </div>
+      <div id="globalError" class="err hidden"></div>
+
+      <section class="summary">
+        <div class="sum-card">
+          <div class="sum-label">Swing — beli</div>
+          <div class="sum-value" id="sumSwing">—</div>
+          <div class="sum-sub" id="sumSwingSub">Menganalisa watchlist…</div>
+        </div>
+        <div class="sum-card">
+          <div class="sum-label">Hold — pegang</div>
+          <div class="sum-value" id="sumHold">—</div>
+          <div class="sum-sub" id="sumHoldSub">Menganalisa watchlist…</div>
+        </div>
+        <div class="sum-card">
+          <div class="sum-label">Skor swing tertinggi</div>
+          <div class="sum-value" id="sumTop">—</div>
+          <div class="sum-sub" id="sumTopSub">—</div>
+        </div>
+      </section>
+
+      <div class="toolbar">
+        <button id="btnAnalyzeSwing" class="primary">Analisa Swing Watchlist</button>
+        <span class="mini">Bagian yang sama juga ada di halaman <a href="analisa.html">Analisa AI</a>.</span>
+      </div>
+
+      <div id="swingWatch" class="panel ai-summary"><p class="muted">Belum dianalisa. Tekan "Analisa Swing Watchlist" untuk menghitung rekomendasi swing &amp; hold dari watchlist.</p></div>
+
+      <section class="panel" style="margin-top:16px">
+        <h2 style="margin-bottom:8px">Swing &amp; Hold — dari 911 Saham IDX</h2>
+        <p class="muted">Dihitung dari hasil scan 911 saham terakhir di halaman Analisa AI. Belum ada hasil scan? Jalankan dulu <a href="analisa.html">scan 911 saham di halaman Analisa AI</a> — hasilnya tersimpan untuk hari ini dan langsung tampil di sini, tanpa perlu scan ulang.</p>
+        <div id="swing911Meta" class="mini" style="margin-top:8px">Belum ada hasil scan 911 saham.</div>
+        <div id="swing911" class="ai-summary">
+          <b>Belum dipindai</b>
+          <p class="muted">Tekan "Mulai Scan 911 Saham" di halaman Analisa AI — analisa memindai 911 saham IDX dalam batch kecil, hasilnya disimpan untuk hari ini dan langsung tampil di halaman ini.</p>
+        </div>
+      </section>
+
+      <footer>Data dari Yahoo Finance, bisa delay ~15 menit. Bukan rekomendasi investasi — selalu cek lagi sebelum membeli atau menjual saham.</footer>
+
+</BaseLayout>
+
+<script>
+import { fmtRp, analyzeStock, analyzeSwing } from "../lib/ai.js";
+import { swingSectionHTML } from "../lib/swingPanel.js";
+
+const LS = { watch: "idx_watchlist", scan911: "screener_scan911_v1" };
+const $ = s => document.querySelector(s);
+const DEFAULT_WATCH = ["BBCA","BBRI","BMRI","BBNI","TLKM","ASII","GOTO","AMRT"];
+function load(k, d){ try{ const v=JSON.parse(localStorage.getItem(k)); return v??d; }catch(e){ return d; } }
+let watch = load(LS.watch, DEFAULT_WATCH);
+let prices = {};
+let ranOnce = false;
+
+async function apiQuote(symbols){
+  const r = await fetch("/api/quote?symbols=" + symbols.map(encodeURIComponent).join(","));
+  if(!r.ok) throw new Error("HTTP " + r.status);
+  return r.json();
+}
+async function refreshQuotes(){
+  if(!watch.length) return;
+  try{
+    const data = await apiQuote(watch.map(c=>c+".JK"));
+    data.results.forEach(q=>{ prices[q.symbol]=q; });
+    const mts = data.results.map(q=>q.marketTime).filter(Boolean).map(t=>new Date(t).getTime()).filter(n=>!isNaN(n));
+    const now = new Date();
+    const fmtTime = d => d.toLocaleTimeString("id-ID",{timeZone:"Asia/Jakarta", hour:"2-digit", minute:"2-digit"});
+    if(mts.length){
+      const latest = Math.max(...mts);
+      const delayMin = Math.max(0, Math.round((now.getTime()-latest)/60000));
+      const el = $("#lastUpdate");
+      el.textContent = `Data bursa per ${fmtTime(new Date(latest))} WIB • telat ${delayMin} mnt • dicek ${fmtTime(now)} WIB`;
+      el.style.color = delayMin > 15 ? "#d97706" : "";
+    } else {
+      $("#lastUpdate").textContent = "Terakhir dicek: " + fmtTime(now) + " WIB (jam data bursa tidak tersedia)";
+    }
+  }catch(e){
+    const el=$("#globalError"); el.textContent="Gagal memuat harga: "+e.message+". Coba refresh lagi."; el.classList.remove("hidden");
+  }
+}
+
+// ---- Swing & hold dari watchlist (data chart 3mo yang sama seperti Analisa AI) ----
+async function analyzeSwingWatch(){
+  const btn=$("#btnAnalyzeSwing");
+  if(!watch.length){ alert("Watchlist kosong — tambah saham dulu."); return; }
+  btn.disabled=true;
+  const panel=$("#swingWatch");
+  const rows=[];
+  for(let i=0;i<watch.length;i++){
+    const code=watch[i];
+    btn.textContent=`Menganalisa… ${i+1}/${watch.length} (${code})`;
+    panel.innerHTML=`<b>Rekomendasi Swing &amp; Hold (1-3 Bulan) — watchlist</b><p class="muted">Menganalisa ${code} (${i+1}/${watch.length})…</p>`;
+    try{
+      const r=await fetch(`/api/chart?symbol=${code}.JK&range=3mo`);
+      if(!r.ok) throw new Error("HTTP "+r.status);
+      const d=await r.json();
+      const a=analyzeStock(code, d.closes||[], prices[code+".JK"]);
+      const swing=analyzeSwing(code, d.closes||[], prices[code+".JK"], a);
+      rows.push({code, a, swing});
+    }catch(e){ console.warn("analisa swing gagal", code, e); }
+  }
+  btn.disabled=false; btn.textContent="Analisa Swing Watchlist";
+  ranOnce=true;
+  if(!rows.length){ panel.innerHTML="<b>Rekomendasi Swing &amp; Hold (1-3 Bulan) — watchlist</b><p class='muted'>Gagal menganalisa semua saham — coba refresh lalu ulangi.</p>"; return; }
+  const swingList=rows.filter(r=>r.swing?.classification==="SWING").sort((x,y)=>y.swing.swingScore-x.swing.swingScore);
+  const holdList=rows.filter(r=>r.swing?.classification==="HOLD").sort((x,y)=>y.swing.swingScore-x.swing.swingScore);
+  const sw=$("#sumSwing"); if(sw){ sw.textContent = swingList.length ? swingList.length + " saham" : "0 saham"; }
+  const sws=$("#sumSwingSub"); if(sws) sws.textContent = swingList.length ? swingList.map(r=>r.code).join(", ") : "Tidak ada yang lolos swing";
+  const ho=$("#sumHold"); if(ho){ ho.textContent = holdList.length ? holdList.length + " saham" : "0 saham"; }
+  const hos=$("#sumHoldSub"); if(hos) hos.textContent = holdList.length ? holdList.map(r=>r.code).join(", ") : "Tidak ada yang masuk hold";
+  const top=swingList[0] || holdList[0];
+  const tp=$("#sumTop"); if(tp){ tp.textContent = top ? top.code + " · " + top.swing.swingScore : "—"; }
+  const tps=$("#sumTopSub"); if(tps) tps.textContent = top ? top.swing.classification + " • " + fmtRp(top.swing.price) : "—";
+  panel.innerHTML = swingSectionHTML(swingList, holdList, "watchlist");
+}
+
+// ---- Swing & hold dari hasil scan 911 (cache hari ini, sama seperti Analisa AI) ----
+// Cache lama (sebelum fitur swing) tidak menyimpan swing — hitung dari hasil
+// analisa yang tersimpan (tanpa closes: tren 3 bulan pakai proksi skor).
+function scan911TodayKey(){ return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }); }
+function fmtClock911(d){ return d.toLocaleTimeString("id-ID", { timeZone: "Asia/Jakarta", hour: "2-digit", minute: "2-digit" }); }
+function loadScan911Cache(){
+  try{
+    const c = JSON.parse(localStorage.getItem(LS.scan911));
+    if(c && c.date === scan911TodayKey() && Array.isArray(c.results)) return c;
+  }catch(e){}
+  return null;
+}
+function renderSwing911(){
+  const el = $("#swing911");
+  const c = loadScan911Cache();
+  if(!c || !c.results.length){
+    $("#swing911Meta").textContent = "Belum ada hasil scan 911 saham.";
+    el.innerHTML = `<b>Belum dipindai</b><p class="muted">Jalankan "Mulai Scan 911 Saham" di halaman <a href="analisa.html">Analisa AI</a> — hasilnya disimpan untuk hari ini dan langsung tampil di halaman ini.</p>`;
+    return;
+  }
+  const results = c.results.map(r => ({ ...r, swing: r.swing || (r.a ? analyzeSwing(r.code, null, null, r.a) : null) }));
+  const swing911 = results.filter(r => r.swing?.classification === "SWING").sort((x, y) => y.swing.swingScore - x.swing.swingScore);
+  const hold911 = results.filter(r => r.swing?.classification === "HOLD").sort((x, y) => y.swing.swingScore - x.swing.swingScore);
+  $("#swing911Meta").textContent = `Dari ${results.length} saham hasil scan • ${swing911.length} swing • ${hold911.length} hold • hasil scan ${fmtClock911(new Date(c.scannedAt))} WIB (data hari ini)`;
+  el.innerHTML = swingSectionHTML(swing911, hold911, "dari 911 saham");
+}
+
+$("#btnAnalyzeSwing").addEventListener("click", analyzeSwingWatch);
+$("#btnRefresh").addEventListener("click", async ()=>{ await refreshQuotes(); if(ranOnce) analyzeSwingWatch(); });
+$("#topSearch").addEventListener("input", e=>{
+  const term=(e.target.value||"").trim().toUpperCase();
+  document.querySelectorAll("#swingWatch tbody tr, #swing911 tbody tr").forEach(tr=>{
+    tr.style.display = !term || tr.textContent.toUpperCase().includes(term) ? "" : "none";
+  });
+});
+
+renderSwing911();
+(async ()=>{ await refreshQuotes(); if(watch.length) analyzeSwingWatch(); })();
+setInterval(async ()=>{ await refreshQuotes(); }, 60000);
+
+</script>

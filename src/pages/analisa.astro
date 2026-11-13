@@ -71,6 +71,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 import { fmtRp, fmtPct, analyzeStock, analyzeScalping, analyzeSwing, fmtVol, fmtTurn, verdictBadge, suggestionBadge, swingBadge } from "../lib/ai.js";
 import { stockLogoHTML } from "../lib/logos.js";
 import { renderAiPanel } from "../lib/analysisPanel.js";
+import { swingSectionHTML } from "../lib/swingPanel.js";
 import { IDX_TICKERS } from "../lib/tickers.js";
 
 const LS = { watch:"idx_watchlist" };
@@ -108,31 +109,6 @@ async function refreshQuotes(){
   }
 }
 
-
-// --- HTML daftar swing & hold (dipakai watchlist dan hasil scan 911) ---
-// scope: label sumbernya, mis. "watchlist" atau "dari 911 saham".
-function swingSectionHTML(swingList, holdList, scope){
-  const row = ({code, swing}) => `<tr>
-    <td><span style="display:flex;gap:8px;align-items:center">${stockLogoHTML(code, 28)}<b>${code}</b></span></td>
-    <td><b>${swing.swingScore}</b></td>
-    <td>${fmtRp(swing.price)}</td>
-    <td style="min-width:220px">${swing.entry}</td>
-    <td>${swing.stopLoss == null ? "—" : fmtRp(swing.stopLoss)}</td>
-    <td>${swing.target == null ? "—" : fmtRp(swing.target)}${swing.target2 != null ? `<br><span class="muted">target 2: ${fmtRp(swing.target2)}</span>` : ""}</td>
-    <td style="min-width:260px">${swing.reasons.join(" ")}</td>
-  </tr>`;
-  const table = (list) => `<div class="tablewrap"><table>
-    <thead><tr><th>Kode</th><th>Skor swing</th><th>Harga</th><th>Entry</th><th>Stop loss</th><th>Target</th><th>Alasan</th></tr></thead>
-    <tbody>${list.map(row).join("")}</tbody>
-  </table></div>`;
-  return `
-    <h3 style="margin-top:16px">Rekomendasi Swing &amp; Hold (1-3 Bulan) — ${scope}</h3>
-    <p class="mini">Sinyal berbasis harga &amp; tren (rule-based), bukan saran keuangan — cek fundamental emiten sebelum beli, dan sesuaikan dengan profil risikomu. Klasifikasi: <b>SWING</b> (skor ≥65: uptrend + entry bagus, layak dibeli untuk dipegang 1-3 bulan), <b>HOLD</b> (skor 55-64 atau uptrend kuat tapi harga sudah jauh di atas MA50: yang sudah punya = pegang 1-3 bulan, yang belum punya = tunggu pullback ke MA20), <b>TUNGGU</b> (skor 40-54: tren belum terkonfirmasi), <b>HINDARI</b> (skor &lt;40: downtrend). Stop loss ~5-8% di bawah harga, target swing +10-15%, target hold +8-12%.</p>
-    <h4 style="margin-top:12px">Swing — beli sekarang / di pullback (${swingList.length})</h4>
-    ${swingList.length ? table(swingList) : `<p><b>Tidak ada saham yang lolos kriteria swing.</b> Tunggu sampai ada saham dengan uptrend terkonfirmasi + entry bagus (pullback ke MA20 atau breakout resistance).</p>`}
-    <h4 style="margin-top:12px">Hold — pegang 1-3 bulan (${holdList.length})</h4>
-    ${holdList.length ? table(holdList) : `<p><b>Tidak ada saham yang masuk kategori hold.</b> Saham yang sudah naik jauh tapi trennya masih kuat akan muncul di sini.</p>`}`;
-}
 
 async function analyzeAll(){
   const btn=$("#btnAnalyzeAll");
@@ -223,7 +199,7 @@ async function analyzeAll(){
         <td style="min-width:260px">${scalp.note}</td>
       </tr>`).join("")}</tbody>
     </table></div>` : `<p><b>Hari ini tidak ada saham yang cocok untuk scalping.</b> Range harian terlalu kecil, likuiditas kurang, atau RSI/MACD tidak mendukung — lebih aman tidak scalping hari ini.</p>`}
-    ${swingSectionHTML(swingList, holdList, "watchlist")}
+    ${swingSectionHTML(swingList, holdList, "watchlist", true)}
     <p class="mini">Klik baris saham di tabel ringkasan untuk melihat alasan detail + rencana entry di panel Analisa AI di bawah. Semua analisa di atas rule-based dari data Yahoo Finance (delay ~10-15 menit) — bukan rekomendasi investasi dan bukan prediksi pasti.</p>`;
   // Klik baris di tabel ringkasan -> panel analisa per saham di bawah
   panel.querySelectorAll(".tablewrap table tbody tr").forEach(tr=>{
@@ -410,7 +386,7 @@ function renderScan911(){
         <td style="min-width:260px">${scalp.note}</td>
       </tr>`).join("")}</tbody>
     </table></div>` : `<p><b>Dari 911 saham, hari ini tidak ada yang cocok untuk scalping.</b> Range harian terlalu kecil, likuiditas kurang, atau RSI/MACD tidak mendukung — lebih aman tidak scalping hari ini.</p>`}
-    ${swingSectionHTML(swing911, hold911, "dari 911 saham")}
+    ${swingSectionHTML(swing911, hold911, "dari 911 saham", true)}
     <p class="mini">Klik baris saham untuk melihat alasan detail + rencana entry di panel Analisa AI. Semua analisa di atas rule-based dari data Yahoo Finance (delay ~10-15 menit) — bukan rekomendasi investasi dan bukan prediksi pasti.</p>`;
   const f = $("#scan911Filter");
   if(f){ f.value = filter; f.addEventListener("change", renderScan911); }
