@@ -14,7 +14,9 @@ vercel-dashboard/
 ├── vercel.json               # maxDuration 10s untuk api/*.js (framework auto-detect Astro)
 ├── api/
 │   ├── quote.js              # Serverless Function: harga terakhir (Yahoo, CommonJS)
-│   └── chart.js              # Serverless Function: data historis + volume (Yahoo, CommonJS)
+│   ├── chart.js              # Serverless Function: data historis + volume (Yahoo, CommonJS)
+│   ├── log-login.js          # Serverless Function: catat login ke Supabase (CommonJS)
+│   └── login-history.js      # Serverless Function: baca riwayat login (CommonJS)
 ├── public/
 │   └── favicon.svg           # mark "S" oranye
 ├── src/
@@ -92,6 +94,51 @@ perlu adapter (`@astrojs/vercel` hanya untuk SSR — situs ini statis).
 > `afrizalrafli27-7448s-projects`). Deploy langsung dengan
 > `vercel deploy` dari CLI yang sudah login ke akun yang sama tidak
 > memakai jalur konektor itu.
+
+## Riwayat login (Supabase)
+
+Tiap percobaan login (berhasil maupun gagal) dicatat ke tabel
+`public.login_history` di Supabase, dan 10 login terakhir tampil di bawah
+form halaman login ("Riwayat Login").
+
+**Tabel yang dibutuhkan** (sudah dibuat di project Supabase
+`rvrzfruyhhrrwxmvngff`):
+
+```sql
+create table if not exists public.login_history (
+  id bigint generated always as identity primary key,
+  logged_in_at timestamptz not null default now(),
+  user_agent text,
+  ip text,
+  success boolean not null default true
+);
+alter table public.login_history enable row level security;
+```
+
+RLS aktif **tanpa policy** — jadi hanya `service_role` key yang bisa
+baca/tulis; `anon` key tidak bisa. Itu disengaja: baca/tulis hanya lewat
+dua Serverless Function di bawah, yang memakai service key di sisi server.
+
+**Environment variable yang wajib diatur di Vercel** (Dashboard Vercel →
+proyek ini → Settings → Environment Variables, lalu redeploy):
+
+| Nama | Isi |
+| --- | --- |
+| `SUPABASE_URL` | URL project, mis. `https://rvrzfruyhhrrwxmvngff.supabase.co` |
+| `SUPABASE_SERVICE_ROLE_KEY` | service_role key (legacy JWT `eyJ...`, atau secret key `sb_secret_...` baru) |
+
+**API yang dipakai:**
+
+- `POST /api/log-login` — dipanggil fire-and-forget dari halaman login
+  setiap percobaan masuk (tidak menunda redirect; bila Supabase belum
+  diatur / sedang down, membalas `{ logged: false }` dan login tetap jalan).
+- `GET /api/login-history` — 50 baris terbaru untuk tampilan riwayat.
+  Bila env belum diatur, membalas `{ configured: false, rows: [] }` dan
+  halaman login menampilkan "Riwayat login belum tersedia — env Supabase
+  belum diatur di Vercel".
+
+Jangan pernah menaruh URL/kunci Supabase di kode atau di repo — hanya di
+Environment Variables Vercel.
 
 ## Cara pakai
 

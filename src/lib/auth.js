@@ -77,6 +77,21 @@ export function logout() {
   location.replace("login.html");
 }
 
+// Catat percobaan login ke Supabase lewat /api/log-login (serverless).
+// Fire-and-forget: tidak di-await, tidak menunda redirect, dan tidak
+// pernah melempar error — bila Supabase belum diatur / sedang down,
+// server membalas { logged: false } dan login tetap jalan seperti biasa.
+export function logLoginAttempt(success) {
+  try {
+    fetch("/api/log-login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ success: !!success }),
+      keepalive: true,
+    }).catch(function () { /* abaikan: pencatatan tidak boleh mengganggu login */ });
+  } catch (e) { /* fetch tidak tersedia: abaikan */ }
+}
+
 // Guard halaman ber-shell: panggil dari <head> (BaseLayout) sebelum konten
 // tampil, supaya halaman tidak sempat berkedip saat belum login.
 // Halaman login sendiri tidak dijaga — kalau tidak, login tidak bisa dibuka.

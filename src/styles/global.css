@@ -229,6 +229,15 @@
   .login-card .hash-out{width:100%;font-size:13px;word-break:break-all;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px;margin-top:12px}
   .login-card .note{font-size:13px;color:var(--muted);margin-top:12px}
   .login-card footer{margin-top:24px}
+  .login-card .history{margin-top:24px;border-top:1px solid var(--line);padding-top:16px}
+  .login-card .history h2{font-size:16px;margin:0 0 4px}
+  .login-card .history .note{margin:0 0 12px}
+  .login-card .history-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+  .login-card .history-list li{border:1px solid var(--line);border-radius:var(--r-md);padding:10px 12px;font-size:14px}
+  .login-card .history-list .t{font-weight:600;font-variant-numeric:tabular-nums}
+  .login-card .history-list .d{color:var(--muted);font-size:13px;margin-top:2px;word-break:break-all}
+  .login-card .history-list .good{color:var(--green)}
+  .login-card .history-list .bad{color:var(--red)}
   @media(max-width:480px){
     body.login-page{padding:12px;padding-bottom:calc(12px + env(safe-area-inset-bottom))}
     .login-card{padding:24px 20px}

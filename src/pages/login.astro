@@ -44,11 +44,20 @@ import "../styles/global.css";
     <p class="note">Yang ditampilkan hanya hash SHA-256, bukan passwordnya. Hash lama di auth.js tetap berlaku sampai kamu menggantinya dan redeploy.</p>
   </details>
 
+  <section class="history" id="loginHistory">
+    <h2>Riwayat Login</h2>
+    <p class="note">Riwayat tersimpan di Supabase.</p>
+    <p id="historyEmpty" class="note hidden">Belum ada riwayat login.</p>
+    <p id="historyUnavailable" class="note hidden">Riwayat login belum tersedia — env Supabase belum diatur di Vercel.</p>
+    <p id="historyError" class="note hidden">Riwayat login tidak bisa dimuat saat ini.</p>
+    <ul id="historyList" class="history-list hidden"></ul>
+  </section>
+
   <footer>Data dari Yahoo Finance, bisa delay ~15 menit. Bukan rekomendasi investasi.</footer>
 </main>
 
     <script>
-import { sha256Hex, PASSWORD_HASH, isLoggedIn, SESSION_KEY } from "../lib/auth.js";
+import { sha256Hex, PASSWORD_HASH, isLoggedIn, SESSION_KEY, logLoginAttempt } from "../lib/auth.js";
 
 (function () {
   var params = new URLSearchParams(location.search);
@@ -63,14 +72,77 @@ import { sha256Hex, PASSWORD_HASH, isLoggedIn, SESSION_KEY } from "../lib/auth.j
     e.preventDefault();
     var pw = document.getElementById("password").value;
     if (pw && sha256Hex(pw) === PASSWORD_HASH) {
+      logLoginAttempt(true); // fire-and-forget, tidak menunda redirect
       try { sessionStorage.setItem(SESSION_KEY, "1"); } catch (err) {}
       location.replace(next);
     } else {
+      logLoginAttempt(false);
       document.getElementById("loginError").classList.remove("hidden");
       document.getElementById("password").value = "";
       document.getElementById("password").focus();
     }
   });
+
+  // Riwayat login dari Supabase (lewat /api/login-history).
+  // User agent diringkas jadi label perangkat/browser; semua teks dimasukkan
+  // lewat textContent (bukan innerHTML) karena user_agent adalah input
+  // yang dikendalikan siapa pun yang mencoba login.
+  function shortUA(ua) {
+    ua = String(ua || "");
+    var device = /Android/i.test(ua) ? "Android"
+      : /iPhone|iPad/i.test(ua) ? "iPhone/iPad"
+      : /Windows/i.test(ua) ? "Windows"
+      : /Macintosh|Mac OS X/i.test(ua) ? "Mac"
+      : /Linux/i.test(ua) ? "Linux" : "Perangkat lain";
+    var browser = /Edg\//i.test(ua) ? "Edge"
+      : /Chrome\//i.test(ua) ? "Chrome"
+      : /Firefox\//i.test(ua) ? "Firefox"
+      : /Safari\//i.test(ua) ? "Safari" : "Browser lain";
+    return device + " · " + browser;
+  }
+
+  function fmtWIB(iso) {
+    try {
+      return new Date(iso).toLocaleString("id-ID", {
+        timeZone: "Asia/Jakarta",
+        day: "2-digit", month: "short", year: "numeric",
+        hour: "2-digit", minute: "2-digit",
+      }) + " WIB";
+    } catch (err) { return String(iso || "—"); }
+  }
+
+  (function loadHistory() {
+    var list = document.getElementById("historyList");
+    var emptyEl = document.getElementById("historyEmpty");
+    var unavailEl = document.getElementById("historyUnavailable");
+    var errEl = document.getElementById("historyError");
+    fetch("/api/login-history")
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (!data || data.configured === false) {
+          unavailEl.classList.remove("hidden");
+          return;
+        }
+        var rows = Array.isArray(data.rows) ? data.rows.slice(0, 10) : [];
+        if (!rows.length) { emptyEl.classList.remove("hidden"); return; }
+        rows.forEach(function (row) {
+          var li = document.createElement("li");
+          var t = document.createElement("div");
+          t.className = "t";
+          t.textContent = fmtWIB(row.logged_in_at);
+          var d = document.createElement("div");
+          d.className = "d";
+          d.textContent = shortUA(row.user_agent) + (row.ip ? " · " + row.ip : "");
+          var s = document.createElement("div");
+          s.className = "d " + (row.success ? "good" : "bad");
+          s.textContent = row.success ? "Berhasil" : "Gagal";
+          li.appendChild(t); li.appendChild(d); li.appendChild(s);
+          list.appendChild(li);
+        });
+        list.classList.remove("hidden");
+      })
+      .catch(function () { errEl.classList.remove("hidden"); });
+  })();
 
   document.getElementById("changeForm").addEventListener("submit", function (e) {
     e.preventDefault();
