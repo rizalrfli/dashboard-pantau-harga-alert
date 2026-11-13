@@ -3,7 +3,7 @@
 // Di halaman Watchlist, Alert & Portofolio adalah tombol tab (data-tab);
 // di halaman lain keduanya link ke index.html#alerts / #port.
 interface Props {
-  active: "watch" | "analisa" | "whale";
+  active: "watch" | "analisa" | "whale" | "news";
   onIndex?: boolean;
 }
 
@@ -29,6 +29,7 @@ const cls = (n: string) => "side-btn" + (active === n ? " active" : "");
     <a class={cls("watch")} href="index.html">Watchlist</a>
     <a class={cls("analisa")} href="analisa.html">Analisa AI</a>
     <a class={cls("whale")} href="whale.html">Whale Detector</a>
+    <a class={cls("news")} href="news.html">Berita</a>
     {
       onIndex ? (
         <>

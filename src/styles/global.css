@@ -243,3 +243,13 @@
     .login-card{padding:24px 20px}
     .login-card input,.login-card button{font-size:16px}
   }
+
+/* ---- Berita (news.html) ---- */
+.chip.active{background:var(--action);color:#fff;border-color:var(--action)}
+.news-list{display:grid;gap:12px}
+.news-card{cursor:default}
+.news-card:hover{transform:none}
+.news-title{display:block;font-size:17px;font-weight:600;line-height:1.4;color:var(--text);text-decoration:none}
+.news-title:hover{color:var(--action);text-decoration:underline}
+.news-meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.news-snippet{margin:8px 0 0;font-size:14px;line-height:1.5;color:var(--muted)}

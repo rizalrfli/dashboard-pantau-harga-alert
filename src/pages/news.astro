@@ -1,0 +1,213 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout
+  title="Berita — Screener AI"
+  description="Berita pasar saham Indonesia terbaru dari Google News RSS — IHSG, bursa, dan saham watchlist. Ditampilkan apa adanya, positif dan negatif."
+  active="news"
+  searchPlaceholder="Cari judul berita…"
+>
+
+      <div class="page-head">
+        <h1>Berita</h1>
+        <div class="sub">Berita pasar saham terbaru dari Google News RSS — <b>IHSG, bursa, dan saham di watchlist kamu</b>. Ditampilkan apa adanya, positif dan negatif, tanpa disaring. Klik judul untuk membaca artikel lengkap di situs sumber.</div>
+        <div id="lastUpdate" class="sub"></div>
+      </div>
+      <div id="globalError" class="err hidden"></div>
+
+      <section class="summary">
+        <div class="sum-card">
+          <div class="sum-label">Berita ditampilkan</div>
+          <div class="sum-value" id="sumCount">—</div>
+          <div class="sum-sub" id="sumCountSub">Memuat…</div>
+        </div>
+        <div class="sum-card">
+          <div class="sum-label">Sumber berita</div>
+          <div class="sum-value" id="sumSources">—</div>
+          <div class="sum-sub">Media dari Google News</div>
+        </div>
+        <div class="sum-card">
+          <div class="sum-label">Berita terbaru</div>
+          <div class="sum-value" id="sumLatest">—</div>
+          <div class="sum-sub" id="sumLatestSub">—</div>
+        </div>
+      </section>
+
+      <div class="toolbar">
+        <button id="btnNewsRefresh" class="primary">Refresh berita</button>
+        <span class="mini" id="newsMeta">Memuat berita…</span>
+      </div>
+
+      <div class="panel" style="margin-top:12px">
+        <h3 style="margin-bottom:8px">Filter berita</h3>
+        <div id="filterChips" style="display:flex;flex-wrap:wrap;gap:4px"></div>
+        <form class="inline" style="margin-top:10px" onsubmit="return false">
+          <div><label for="newsSearch">Cari judul</label><input id="newsSearch" placeholder="cth: IHSG, BBCA, dividen" autocomplete="off"></div>
+        </form>
+        <p class="mini" style="margin-top:8px">Tag sentimen (Positif / Negatif / Netral) hanya <b>perkiraan kata kunci</b> dari judul berita, bukan analisis — berita negatif tidak pernah disembunyikan atau diturunkan karena tag-nya.</p>
+      </div>
+
+      <div id="newsList" class="news-list" style="margin-top:12px"></div>
+
+      <footer>Berita dari Google News RSS (judul + cuplikan saja, bukan isi artikel lengkap). Bukan rekomendasi investasi — selalu cek lagi sebelum membeli atau menjual saham.</footer>
+
+</BaseLayout>
+
+<script>
+import { IDX_TICKERS } from "../lib/tickers.js";
+
+// ---- Berita: ambil dari /api/news (Google News RSS), tampilkan semua ----
+// Tanpa filter sentimen: berita positif dan negatif tampil apa adanya.
+const $ = s => document.querySelector(s);
+const DEFAULT_WATCH = ["BBCA","BBRI","BMRI","BBNI","TLKM","ASII","GOTO","AMRT"];
+const TICKER_NAME = {};
+IDX_TICKERS.forEach(t => { TICKER_NAME[t.code] = t.name; });
+
+let items = [];
+let activeTopic = "Semua";
+let searchTerm = "";
+let loading = false;
+
+function loadWatch(){
+  try{
+    const v = JSON.parse(localStorage.getItem("idx_watchlist"));
+    if (Array.isArray(v) && v.length) return v.filter(c=>typeof c==="string").map(c=>c.toUpperCase());
+  }catch(e){}
+  return DEFAULT_WATCH.slice();
+}
+
+function esc(s){
+  return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+function relTime(iso){
+  if(!iso) return "—";
+  const t = new Date(iso).getTime();
+  if(isNaN(t)) return "—";
+  const diff = Date.now() - t;
+  if(diff < 0) return "baru saja";
+  const m = Math.floor(diff / 60000);
+  if(m < 1) return "baru saja";
+  if(m < 60) return m + " mnt lalu";
+  const h = Math.floor(m / 60);
+  if(h < 24) return h + " jam lalu";
+  const d = Math.floor(h / 24);
+  return d + " hari lalu";
+}
+
+function fmtClockWIB(iso){
+  try{
+    return new Date(iso).toLocaleTimeString("id-ID", { timeZone: "Asia/Jakarta", hour: "2-digit", minute: "2-digit" });
+  }catch(e){ return ""; }
+}
+
+function sentimentBadge(s){
+  const cls = s === "Positif" ? "badge-bull" : s === "Negatif" ? "badge-bear" : "badge-neutral";
+  return `<span class="badge ${cls}">${esc(s)}</span>`;
+}
+
+function filtered(){
+  return items.filter(it => {
+    if(activeTopic !== "Semua" && !(it.topics || []).includes(activeTopic)) return false;
+    if(searchTerm){
+      const hay = ((it.title || "") + " " + (it.source || "")).toLowerCase();
+      if(!hay.includes(searchTerm)) return false;
+    }
+    return true;
+  });
+}
+
+function renderChips(watch){
+  const topics = ["Semua", "IHSG & Pasar", ...watch];
+  $("#filterChips").innerHTML = topics.map(t =>
+    `<button type="button" class="chip${t === activeTopic ? " active" : ""}" data-topic="${esc(t)}">${esc(t)}</button>`
+  ).join("");
+  $("#filterChips").querySelectorAll(".chip").forEach(b=>{
+    b.addEventListener("click", ()=>{ activeTopic = b.dataset.topic; renderChips(watch); renderList(); });
+  });
+}
+
+function renderList(){
+  const el = $("#newsList");
+  const list = filtered();
+  const sources = new Set(items.map(i=>i.source)).size;
+  $("#sumCount").textContent = items.length ? items.length + " berita" : "0 berita";
+  $("#sumCountSub").textContent = list.length !== items.length ? `Menampilkan ${list.length} dari ${items.length} (filter aktif)` : "Maksimal 30 berita terbaru";
+  $("#sumSources").textContent = sources ? sources + " media" : "—";
+  if(items.length){
+    const newest = items[0];
+    $("#sumLatest").textContent = relTime(newest.publishedAt);
+    $("#sumLatestSub").textContent = newest.source || "";
+  } else {
+    $("#sumLatest").textContent = "—";
+    $("#sumLatestSub").textContent = "—";
+  }
+
+  if(!items.length){
+    el.innerHTML = `<div class="panel"><b>Belum ada berita</b><p class="muted">Gagal memuat dari Google News, atau tidak ada berita untuk kueri saat ini. Coba tekan "Refresh berita" — bila tetap kosong, feed Google News mungkin sedang membatasi permintaan.</p></div>`;
+    return;
+  }
+  if(!list.length){
+    el.innerHTML = `<div class="panel"><b>Tidak ada berita yang cocok</b><p class="muted">Coba ubah filter (mis. topik "Semua") atau kosongkan pencarian.</p></div>`;
+    return;
+  }
+  el.innerHTML = list.map(it => `
+    <article class="card news-card">
+      <a class="news-title" href="${esc(it.link)}" target="_blank" rel="noopener noreferrer">${esc(it.title)}</a>
+      <div class="news-meta">
+        <span>${esc(it.source)}</span><span aria-hidden="true">•</span><span>${relTime(it.publishedAt)}</span>
+        <span>${sentimentBadge(it.sentiment)}</span>
+        ${(it.topics || []).filter(t=>t !== "IHSG & Pasar").map(t=>`<span class="badge badge-neutral">${esc(t)}</span>`).join("")}
+      </div>
+      ${it.snippet ? `<p class="news-snippet">${esc(it.snippet)}</p>` : ""}
+    </article>`).join("");
+}
+
+async function loadNews(){
+  if(loading) return;
+  loading = true;
+  $("#newsMeta").textContent = "Memuat berita…";
+  $("#btnNewsRefresh").disabled = true;
+  try{
+    const watch = loadWatch();
+    const symbols = watch.slice(0, 4).join(",");
+    const r = await fetch(`/api/news?symbols=${encodeURIComponent(symbols)}`);
+    if(!r.ok) throw new Error("HTTP " + r.status);
+    const d = await r.json();
+    items = Array.isArray(d.items) ? d.items : [];
+    // Urutan sudah terbaru dulu dari API; pastikan tetap begitu.
+    items.sort((a,b)=> (b.publishedAt||"") < (a.publishedAt||"") ? -1 : 1);
+    $("#lastUpdate").textContent = d.updatedAt
+      ? `Diperbarui ${fmtClockWIB(d.updatedAt)} WIB • sumber: Google News RSS`
+      : "";
+    $("#newsMeta").textContent = items.length
+      ? `${items.length} berita terbaru • diperbarui ${fmtClockWIB(d.updatedAt)} WIB`
+      : "Tidak ada berita yang berhasil dimuat.";
+    if(d.errors && d.errors.length){
+      $("#globalError").textContent = "Sebagian feed gagal dimuat (" + d.errors.length + " kueri) — yang tampil hanya berita dari feed yang berhasil.";
+      $("#globalError").classList.remove("hidden");
+    } else {
+      $("#globalError").classList.add("hidden");
+    }
+    renderChips(watch);
+    renderList();
+  }catch(e){
+    items = [];
+    $("#newsMeta").textContent = "Gagal memuat berita: " + e.message;
+    renderChips(loadWatch());
+    renderList();
+  }finally{
+    loading = false;
+    $("#btnNewsRefresh").disabled = false;
+  }
+}
+
+$("#btnNewsRefresh").addEventListener("click", loadNews);
+const refreshBtn = $("#btnRefresh");
+if(refreshBtn) refreshBtn.addEventListener("click", loadNews);
+$("#newsSearch").addEventListener("input", e=>{ searchTerm = e.target.value.trim().toLowerCase(); renderList(); });
+$("#topSearch").addEventListener("input", e=>{ searchTerm = e.target.value.trim().toLowerCase(); $("#newsSearch").value = e.target.value; renderList(); });
+
+loadNews();
+</script>
