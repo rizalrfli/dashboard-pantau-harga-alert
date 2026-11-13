@@ -29,7 +29,11 @@ function normaliseSymbol(raw) {
 }
 
 async function fetchQuote(symbol) {
-  const path = `/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1d`;
+  // Pakai range 5d agar ada bar harian kemarin untuk menghitung previousClose.
+  // chartPreviousClose di meta Yahoo TIDAK bisa dipercaya: untuk range 1d dia
+  // sama dengan harga terakhir saat pasar belum buka (change 0%), dan untuk
+  // range 5d dia adalah harga awal rentang, bukan penutupan kemarin.
+  const path = `/v8/finance/chart/${encodeURIComponent(symbol)}?range=5d&interval=1d`;
   let lastErr = null;
   for (const host of YAHOO_HOSTS) {
     try {
@@ -46,10 +50,33 @@ async function fetchQuote(symbol) {
       if (!result) { lastErr = new Error('Yahoo: no result'); continue; }
       const meta = result.meta || {};
       const price = meta.regularMarketPrice ?? meta.fulldayPrice ?? null;
-      // previousClose dari meta bisa tidak akurat untuk beberapa simbol;
-      // pakai chartPreviousClose bila ada, fallback ke previousClose.
-      const previousClose = meta.chartPreviousClose ?? meta.previousClose ?? null;
       if (price == null) { lastErr = new Error('Yahoo: no price'); continue; }
+      // Cara paling akurat: turunkan previousClose dari change% resmi Yahoo
+      // (regularMarketChangePercent), karena itu yang dipakai Yahoo sendiri.
+      // Contoh BBCA: 5450 / (1 - 0,457%) = 5475, BBRI: 3010 / (1 - 0,66%) = 3030.
+      const changePct = meta.regularMarketChangePercent;
+      const prevFromChange =
+        changePct != null && changePct !== 0
+          ? price / (1 + changePct / 100)
+          : null;
+      // Fallback: penutupan bar harian kedua terakhir (bar terakhir = hari ini).
+      const closes = (result.indicators?.quote?.[0]?.close || []).filter(
+        (v) => v != null
+      );
+      const prevFromBars = closes.length >= 2 ? closes[closes.length - 2] : null;
+      // Pakai prevFromChange bila ada; bila tidak ada (change% 0, misal
+      // sebelum pasar buka), pakai bar kemarin selama berbeda dari harga.
+      let previousClose = prevFromChange;
+      if (previousClose == null) {
+        previousClose =
+          prevFromBars != null && prevFromBars !== price ? prevFromBars : null;
+      }
+      if (previousClose == null) {
+        previousClose =
+          meta.chartPreviousClose != null && meta.chartPreviousClose !== price
+            ? meta.chartPreviousClose
+            : price;
+      }
       const change = previousClose != null ? price - previousClose : null;
       const changePercent =
         previousClose != null && previousClose !== 0

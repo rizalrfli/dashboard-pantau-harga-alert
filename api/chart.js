@@ -59,12 +59,22 @@ module.exports = async (req, res) => {
         v == null ? null : v
       );
       // chartPreviousClose Yahoo untuk range >1d adalah harga awal rentang,
-      // bukan penutupan kemarin — jadi hitung dari bar harian terakhir.
+      // bukan penutupan kemarin. Utamakan turunan dari change% resmi Yahoo
+      // (sama seperti api/quote.js), fallback ke bar kedua terakhir.
+      // Ini penting bila ada bar null di tengah seri (misal ^JKSE), yang
+      // membuat valid[-2] melompat ke hari yang salah.
       const valid = closes.filter((v) => v != null);
+      const price = meta.regularMarketPrice ?? valid[valid.length - 1] ?? null;
+      const changePct = meta.regularMarketChangePercent;
+      const prevFromChange =
+        price != null && changePct != null && changePct !== 0
+          ? price / (1 + changePct / 100)
+          : null;
       const previousClose =
-        valid.length >= 2
+        prevFromChange ??
+        (valid.length >= 2
           ? valid[valid.length - 2]
-          : (meta.chartPreviousClose ?? meta.previousClose ?? null);
+          : (meta.chartPreviousClose ?? meta.previousClose ?? null));
       return res.status(200).json({
         symbol: meta.symbol || symbol,
         range,
