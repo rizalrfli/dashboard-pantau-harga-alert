@@ -7,6 +7,10 @@
    (login di-scope supaya tidak bocor ke dashboard). */
 /* ---- Satu sistem (taste-skill): satu radius, satu bayangan, satu pasangan tombol ---- */
   :root{
+    /* color-scheme: beri tahu browser bahwa halaman ini punya tema gelap
+       yang dirancang (lihat @media prefers-color-scheme: dark di bawah),
+       supaya Chrome di HP tidak memaksa invert (auto dark). */
+    color-scheme: light dark;
     --bg:#f6f7f8; --panel:#ffffff; --surface:#f8fafc; --line:#e3e6ea; --line-strong:#d1d5db;
     --text:#111827; --muted:#5b6470; --faint:#8a94a3;
     --green:#15803d; --green-bg:#dcfce7; --red:#b91c1c; --red-bg:#fee2e2;
@@ -34,7 +38,13 @@
   .logo{display:flex;gap:10px;align-items:center;padding:var(--s-1) var(--s-2) var(--s-4);border-bottom:1px solid var(--line);margin-bottom:var(--s-2)}
   .logo-mark{width:38px;height:38px;border-radius:var(--r-md);background:var(--orange);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
   .logo b{display:block;font-size:17px;letter-spacing:.01em}
-  .logo span{display:block;font-size:12px;color:var(--muted)}
+  /* Dulu `.logo span` — selektor itu juga mengenai .logo-mark (yang juga
+     <span>), dan spesifikasinya (0,1,1) mengalahkan .logo-mark (0,1,0):
+     huruf "S" jadi display:block 12px menempel di tepi kiri kotak,
+     persis seperti di screenshot user. Sekarang dibatasi ke span di
+     dalam div teks saja, dan .logo-mark diperkuat spesifikasinya. */
+  .logo>div span{display:block;font-size:12px;color:var(--muted)}
+  .logo .logo-mark{font-size:20px}
   .side-label{font-size:13px;font-weight:500;color:var(--muted);padding:10px 10px 4px}
   .side-nav{display:flex;flex-direction:column;gap:var(--s-1)}
   .side-btn{display:flex;text-decoration:none;align-items:center;gap:10px;width:100%;text-align:left;padding:11px 12px;border:none;border-radius:var(--r-md);background:transparent;color:#334155;font-weight:500;font-size:15px;cursor:pointer;font-family:inherit;min-height:44px;transition:background .15s ease}
@@ -75,14 +85,15 @@
   h2{font-size:20px;line-height:1.3;margin:0;font-weight:600}
   h3{font-size:16px;line-height:1.4;margin:0;font-weight:600}
   .sub{color:var(--muted);font-size:14px}
-  #lastUpdate{margin-top:var(--s-1);font-weight:500;color:#334155}
+  #lastUpdate{margin-top:var(--s-1);font-weight:500;color:#334155;overflow-wrap:break-word}
   /* ---- Kartu ringkasan ---- */
-  .summary{display:grid;grid-template-columns:1fr;gap:var(--s-4);margin:var(--s-4) 0}
-  .sum-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);padding:var(--s-4);box-shadow:var(--shadow)}
+  .summary{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--s-4);margin:var(--s-4) 0}
+  .sum-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);padding:var(--s-4);box-shadow:var(--shadow);min-width:0;overflow-wrap:break-word}
   .sum-label{font-size:13px;font-weight:500;color:var(--muted)}
   .sum-value{font-size:28px;font-weight:700;color:var(--text);margin-top:var(--s-1);font-variant-numeric:tabular-nums}
   .sum-sub{font-size:14px;color:var(--muted);margin-top:2px}
   .ihsg{display:flex;gap:8px 14px;flex-wrap:wrap;align-items:baseline;margin-top:6px}
+  .ihsg>*{min-width:0}
   .ihsg b{font-size:22px;font-variant-numeric:tabular-nums}
   .up{color:var(--green)} .down{color:var(--red)} .muted{color:var(--muted)}
   .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:var(--s-4) 0}
@@ -94,34 +105,60 @@
   button:not(.primary):not(.side-btn):not(.del):hover{border-color:var(--text)}
   .tabs{display:flex;gap:6px;margin:6px 0 var(--s-4)}
   .tabs button.active{background:var(--action);color:#fff;border-color:var(--action)}
-  .grid{display:grid;grid-template-columns:1fr;gap:var(--s-3)}
-  @media(min-width:768px){.grid{grid-template-columns:1fr 1fr}}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);padding:var(--s-4);cursor:pointer;box-shadow:var(--shadow);transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease}
+  /* ---- Kartu: satu sistem, tidak pernah meluber ----
+     Perbaikan dari laporan HP user (teks "Belum dianalisa" terpotong di
+     tepi kanan): kartu adalah grid item — min-width:auto bawaannya membuat
+     kartu tidak bisa mengecil di bawah min-content isinya. Pemicunya
+     .name yang white-space:nowrap (satu baris nama perusahaan yang tidak
+     bisa putus). Maka: track grid minmax(0,1fr), semua item min-width:0,
+     nama perusahaan clamp 2 baris (bukan 1 baris nowrap), dan semua teks
+     kartu boleh wrap. Kartu juga jadi flex kolom dengan gap satu skala
+     (--s-2) supaya jarak antar-baris konsisten di semua kartu. */
+  .grid{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--s-3)}
+  .grid>*{min-width:0}
+  @media(min-width:768px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);padding:var(--s-4);cursor:pointer;box-shadow:var(--shadow);transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease;display:flex;flex-direction:column;gap:var(--s-2);min-width:0;overflow:hidden;overflow-wrap:break-word}
   .card:hover{transform:translateY(-2px);box-shadow:var(--shadow-lift);border-color:var(--line-strong)}
   .card .sym{font-size:18px;font-weight:600}
-  .card .name{color:var(--muted);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* Nama perusahaan: maksimal 2 baris dengan ellipsis (dulu 1 baris
+     nowrap — itu yang memaksa kartu meluber di HP ber-font besar). */
+  .card .name{color:var(--muted);font-size:14px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:break-word}
+  .card .mini{overflow-wrap:break-word}
+  /* Baris kepala kartu: logo + kode (menyusut) + tombol hapus (tetap). */
+  .card-head{align-items:center}
+  .card-id{display:flex;gap:8px;align-items:center;min-width:0;flex:1}
+  .card-price{align-items:baseline}
+  /* Info harga dalam grid 2 kolom label + nilai — rapi, tidak ada baris
+     panjang yang terpotong. */
+  .card-meta{display:grid;grid-template-columns:1fr 1fr;gap:var(--s-1) var(--s-3)}
+  .card-meta>div{min-width:0}
+  .card-meta small{display:block;color:var(--muted);font-size:12px;line-height:1.3}
+  .card-meta b{display:block;font-size:14px;font-variant-numeric:tabular-nums;overflow-wrap:break-word}
+  .card-badges{display:flex;flex-wrap:wrap;gap:6px}
+  .card-note{font-size:14px;color:var(--muted);line-height:1.5;overflow-wrap:break-word}
   .price{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
   .price.up{color:var(--green)}
   .price.down{color:var(--red)}
   .row{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
-  .mini{font-size:14px;color:var(--muted)}
+  .row>*{min-width:0}
+  .mini{font-size:14px;color:var(--muted);overflow-wrap:break-word}
   .chip{display:inline-block;background:var(--panel);border:1px solid var(--line-strong);border-radius:999px;padding:4px 10px;margin:2px 4px 2px 0;cursor:pointer;font-size:14px;color:#334155;min-height:32px}
   .chip:hover{border-color:var(--action);color:var(--action)}
-  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);padding:var(--s-4);margin-top:var(--s-3);box-shadow:var(--shadow)}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);padding:var(--s-4);margin-top:var(--s-3);box-shadow:var(--shadow);min-width:0;overflow-wrap:break-word}
   .hidden{display:none!important}
-  canvas{display:block;width:100%;max-width:100%;height:220px;background:#fff;border:1px solid var(--line);border-radius:var(--r-md)}
-  .stat{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px}
-  @media(min-width:768px){.stat{grid-template-columns:repeat(4,1fr)}}
-  .stat div{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);padding:8px}
+  canvas{display:block;width:100%;max-width:100%;height:220px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r-md)}
+  .stat{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
+  @media(min-width:768px){.stat{grid-template-columns:repeat(4,minmax(0,1fr))}}
+  .stat div{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);padding:8px;min-width:0;overflow-wrap:break-word}
   .stat small{color:var(--muted);display:block;font-size:13px}
   .stat b{font-variant-numeric:tabular-nums}
   table{width:100%;border-collapse:collapse;font-size:15px}
   th,td{padding:8px 4px;border-bottom:1px solid var(--line);text-align:left;font-variant-numeric:tabular-nums}
   th{color:var(--muted);font-size:13px;font-weight:500}
-  .alert-item,.trig{border:1px solid var(--line);border-left:3px solid var(--amber);padding:8px 10px;margin:8px 0;background:var(--panel);border-radius:var(--r-sm)}
+  .alert-item,.trig{border:1px solid var(--line);border-left:3px solid var(--amber);padding:8px 10px;margin:8px 0;background:var(--panel);border-radius:var(--r-sm);min-width:0;overflow-wrap:break-word}
   .trig{border-left-color:var(--red)}
   footer{color:var(--muted);font-size:13px;margin:var(--s-6) 0;text-align:center}
-  .empty{padding:var(--s-5);text-align:center;color:var(--muted);border:1px dashed var(--line-strong);border-radius:var(--r-lg);background:var(--panel)}
+  .empty{padding:var(--s-5);text-align:center;color:var(--muted);border:1px dashed var(--line-strong);border-radius:var(--r-lg);background:var(--panel);min-width:0;overflow-wrap:break-word}
   .err{background:var(--panel);border:1px solid var(--red);color:var(--red);padding:10px;border-radius:var(--r-md);margin:10px 0}
   form.inline{display:flex;gap:8px;flex-wrap:wrap;align-items:end}
   form.inline label{font-size:13px;color:var(--muted);display:block}
@@ -131,7 +168,7 @@
   #alValue{width:120px}
   #pfLot{width:90px}
   #pfPrice{width:130px}
-  .del{background:none;border:none;color:var(--red);padding:2px 6px;min-height:32px}
+  .del{background:none;border:none;color:var(--red);padding:2px 6px;min-height:32px;flex-shrink:0}
   /* ---- Analisa AI ---- */
   .badge{display:inline-block;border-radius:999px;padding:2px 9px;font-size:13px;font-weight:600;white-space:nowrap}
   .badge-bull{background:var(--green-bg);color:var(--green);border:1px solid #bbf7d0}
@@ -140,7 +177,7 @@
   .badge-wns{background:var(--amber-bg);color:var(--amber);border:1px solid #fde68a}
   .scorebar{height:10px;background:var(--line);border-radius:999px;overflow:hidden;margin:6px 0}
   .scorebar i{display:block;height:100%;border-radius:999px}
-  .ai-panel{margin-top:var(--s-3);border:1px solid var(--line);border-radius:var(--r-lg);padding:var(--s-4);background:var(--panel);box-shadow:var(--shadow)}
+  .ai-panel{margin-top:var(--s-3);border:1px solid var(--line);border-radius:var(--r-lg);padding:var(--s-4);background:var(--panel);box-shadow:var(--shadow);min-width:0;overflow-wrap:break-word}
   .ai-panel h3{margin:0 0 8px;font-size:16px}
   .ai-panel ul{margin:8px 0;padding-left:20px;font-size:15px}
   .ai-panel li{margin-bottom:4px}
@@ -180,7 +217,7 @@
     .sum-value{font-size:24px}
     /* Ringkasan 2 kolom di HP (kartu terakhir yang jumlahnya ganjil
        membentang penuh, mis. 1 kartu IHSG atau kartu ke-3 dari 3 kartu). */
-    .summary{grid-template-columns:repeat(2,1fr);gap:12px}
+    .summary{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
     .summary .sum-card:last-child:nth-child(odd){grid-column:1/-1}
     /* Navigasi bawah: 5 halaman utama, 60px + safe-area, aktif = oranye */
     .bottom-nav{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--panel);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
@@ -309,7 +346,44 @@
 .news-hide{position:absolute;top:10px;right:10px;width:32px;height:32px;min-height:32px;padding:0;display:flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--muted);font-size:13px;line-height:1}
 .news-hide:hover{border-color:var(--text);color:var(--text)}
 @media(max-width:860px){.news-hide{width:44px;height:44px;min-height:44px}}
-.news-title{display:block;font-size:17px;font-weight:600;line-height:1.4;color:var(--text);text-decoration:none}
+/* Kartu berita juga memakai .card (flex kolom + gap) — margin atas
+   anak-anaknya dihapus supaya jaraknya satu sumber (gap), bukan ganda. */
+.news-title{display:block;font-size:17px;font-weight:600;line-height:1.4;color:var(--text);text-decoration:none;overflow-wrap:break-word}
 .news-title:hover{color:var(--action);text-decoration:underline}
-.news-meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
-.news-snippet{margin:8px 0 0;font-size:14px;line-height:1.5;color:var(--muted)}
+.news-meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:0}
+.news-snippet{margin:0;font-size:14px;line-height:1.5;color:var(--muted);overflow-wrap:break-word}
+
+/* ---- Tema gelap (prefers-color-scheme: dark) ----
+   Dulu tidak ada tema gelap sama sekali, jadi Chrome di HP memaksa invert
+   (auto dark theme) dan halaman tampil hitam pekat yang tidak dirancang —
+   persis seperti di screenshot user. Dengan token di bawah + <meta
+   name="color-scheme"> di head, browser memakai tema gelap yang dirancang
+   ini, bukan hasil invert. Aksen oranye tetap, hanya sedikit diterangkan
+   supaya kontras di latar gelap. Warna hijau/merah dibuat lebih terang
+   supaya angka naik/turun tetap terbaca. Mode terang (desktop + HP yang
+   memakai tema terang) tidak berubah sama sekali.
+   Yang sengaja tetap putih: ubin logo saham (.stock-logo) — logo emiten
+   butuh latar putih supaya terbaca, seperti ikon aplikasi. */
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0e1013; --panel:#171a20; --surface:#20242d; --line:#2b313c; --line-strong:#3d4452;
+    --text:#e6e8eb; --muted:#9aa3b0; --faint:#6e7681;
+    --green:#4ade80; --green-bg:#122b1d; --red:#f87171; --red-bg:#2f1215;
+    --amber:#fbbf24; --amber-bg:#2e1f08;
+    --blue:#60a5fa;
+    --orange:#ff8c2e;
+    --shadow:0 1px 2px rgba(0,0,0,.45);
+    --shadow-lift:0 4px 14px rgba(0,0,0,.55);
+  }
+  /* Warna yang di-hardcode di CSS (bukan token) — harus ikut gelap: */
+  button,input,select{background:var(--panel)}
+  .side-btn{color:#cbd5e1}
+  .chip{color:#d6dbe2}
+  #lastUpdate{color:#cbd5e1}
+  .badge-bull{border-color:#14532d}
+  .badge-bear{border-color:#450a0a}
+  .badge-wns{border-color:#451a03}
+  .login-card button.secondary{background:var(--panel)}
+  .skip-link{background:var(--panel);color:var(--text)}
+  #detail:not(.hidden){box-shadow:0 -8px 30px rgba(0,0,0,.55)}
+}

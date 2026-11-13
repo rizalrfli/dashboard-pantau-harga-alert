@@ -20,7 +20,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
       <section class="summary">
         <div class="sum-card">
           <div class="sum-label">IHSG • Indeks Harga Saham Gabungan</div>
-          <div id="ihsg"><span class="muted">Memuat IHSG…</span></div>
+          <div id="ihsg" class="ihsg"><span class="muted">Memuat IHSG…</span></div>
         </div>
       </section>
 
@@ -219,15 +219,20 @@ function renderWatch(){
     const sym = code+".JK", q = prices[sym];
     const div = document.createElement("div"); div.className="card";
     div.onclick = ()=>openDetail(code);
-    if(!q){ div.innerHTML=`<div class="row"><span style="display:flex;gap:8px;align-items:center;min-width:0">${stockLogoHTML(code)}<span class="sym">${code}</span></span><button class="del" title="Hapus">✕</button></div><p class="muted">Harga belum tersedia — coba refresh.</p>`; }
+    if(!q){ div.innerHTML=`<div class="row card-head"><span class="card-id">${stockLogoHTML(code)}<span class="sym">${code}</span></span><button class="del" title="Hapus">✕</button></div><p class="card-note">Harga belum tersedia — coba refresh.</p>`; }
     else{
       const cls=(q.changePercent||0)>=0?"up":"down";
       const a=analysis[code];
-      div.innerHTML=`<div class="row"><span style="display:flex;gap:8px;align-items:center;min-width:0">${stockLogoHTML(code)}<span class="sym">${code}</span></span><button class="del" title="Hapus">✕</button></div>
+      div.innerHTML=`<div class="row card-head"><span class="card-id">${stockLogoHTML(code)}<span class="sym">${code}</span></span><button class="del" title="Hapus">✕</button></div>
         <div class="name">${q.longName||""}</div>
-        <div class="row" style="margin-top:6px"><span class="price ${cls}">${fmtRp(q.price)}</span><span class="${cls}"><b>${fmtPct(q.changePercent)}</b></span></div>
-        <div class="mini">Tertinggi ${fmtRp(q.dayHigh)} • Terendah ${fmtRp(q.dayLow)}<br>Volume ${fmtNum(q.volume)} • Prev close ${fmtRp(q.previousClose)}</div>
-        ${a ? `<div style="margin-top:8px">${verdictBadge(a)} ${suggestionBadge(a.suggestion)}</div>` : `<div class="mini" style="margin-top:8px">Belum dianalisa — jalankan Analisa Semua Saham atau buka detail saham ini.</div>`}`;
+        <div class="row card-price"><span class="price ${cls}">${fmtRp(q.price)}</span><span class="${cls}"><b>${fmtPct(q.changePercent)}</b></span></div>
+        <div class="card-meta">
+          <div><small>Tertinggi</small><b>${fmtRp(q.dayHigh)}</b></div>
+          <div><small>Terendah</small><b>${fmtRp(q.dayLow)}</b></div>
+          <div><small>Volume</small><b>${fmtNum(q.volume)}</b></div>
+          <div><small>Prev close</small><b>${fmtRp(q.previousClose)}</b></div>
+        </div>
+        ${a ? `<div class="card-badges">${verdictBadge(a)} ${suggestionBadge(a.suggestion)}</div>` : `<div class="card-note">Belum dianalisa — jalankan Analisa Semua Saham atau buka detail saham ini.</div>`}`;
     }
     div.querySelector(".del").onclick = e=>{ e.stopPropagation(); watch=watch.filter(c=>c!==code); save(LS.watch,watch); renderWatch(); refreshAll(); };
     grid.appendChild(div);
@@ -268,6 +273,12 @@ let lastCloses = null; // closes terakhir, untuk menggambar ulang grafik saat le
 function drawChart(canvas, closes){
   // Ukuran bitmap mengikuti lebar kartu x devicePixelRatio (tajam di HP retina),
   // gambar digambar ulang dalam satuan CSS px.
+  // Warna dibaca dari token CSS (bukan hardcode) supaya grafik ikut tema
+  // gelap — dulu garis grid #e5e7eb dan teks #64748b akan hilang di latar gelap.
+  const cssVars=getComputedStyle(document.documentElement);
+  const gridCol=cssVars.getPropertyValue("--line").trim()||"#e5e7eb";
+  const mutedCol=cssVars.getPropertyValue("--muted").trim()||"#64748b";
+  const blueCol=cssVars.getPropertyValue("--blue").trim()||"#2563eb";
   const dpr=window.devicePixelRatio||1;
   const cssW=canvas.clientWidth||900, cssH=canvas.clientHeight||220;
   canvas.width=Math.round(cssW*dpr); canvas.height=Math.round(cssH*dpr);
@@ -275,10 +286,10 @@ function drawChart(canvas, closes){
   ctx.setTransform(dpr,0,0,dpr,0,0);
   const W=cssW, H=cssH;
   ctx.clearRect(0,0,W,H);
-  const vals=closes.filter(v=>v!=null); if(vals.length<2){ ctx.fillStyle="#64748b"; ctx.font="16px sans-serif"; ctx.fillText("Data grafik belum tersedia",20,40); return; }
+  const vals=closes.filter(v=>v!=null); if(vals.length<2){ ctx.fillStyle=mutedCol; ctx.font="16px sans-serif"; ctx.fillText("Data grafik belum tersedia",20,40); return; }
   const min=Math.min(...vals), max=Math.max(...vals), pad=(max-min)*0.08||1;
   const lo=min-pad, hi=max+pad;
-  ctx.strokeStyle="#e5e7eb"; ctx.beginPath();
+  ctx.strokeStyle=gridCol; ctx.beginPath();
   for(let i=1;i<5;i++){ const y=H*i/5; ctx.moveTo(0,y); ctx.lineTo(W,y); } ctx.stroke();
   const pts=closes.map((v,i)=> v==null ? null : {x:i/(closes.length-1)*W, y:H-(v-lo)/(hi-lo)*H}).filter(p=>p);
   // Garis oranye (gaya Extej) + gradien oranye muda di bawahnya
@@ -290,7 +301,7 @@ function drawChart(canvas, closes){
   ctx.lineTo(pts[pts.length-1].x,H); ctx.lineTo(pts[0].x,H); ctx.closePath();
   ctx.fillStyle=grad; ctx.fill();
   // garis MA20 (putus-putus, biru)
-  const ma=sma(closes,20); ctx.strokeStyle="#2563eb"; ctx.setLineDash([5,4]); ctx.beginPath();
+  const ma=sma(closes,20); ctx.strokeStyle=blueCol; ctx.setLineDash([5,4]); ctx.beginPath();
   let started=false; ma.forEach((v,i)=>{ if(v==null) return; const x=i/(closes.length-1)*W; const y=H-(v-lo)/(hi-lo)*H; if(!started){ctx.moveTo(x,y);started=true;} else ctx.lineTo(x,y); });
   ctx.stroke(); ctx.setLineDash([]);
 }
