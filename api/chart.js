@@ -1,8 +1,10 @@
 // api/chart.js — Vercel Serverless Function
 // Proxy data historis saham IDX dari Yahoo Finance (publik, tanpa API key).
 // GET /api/chart?symbol=BBCA.JK&range=1mo|3mo|6mo  (default 3mo)
-// Balasan: { symbol, range, currency, previousClose, timestamps, closes }
-// timestamps: epoch detik, closes: harga penutupan (null bila data kosong).
+// Balasan: { symbol, range, currency, previousClose, timestamps, closes, volumes }
+// timestamps: epoch detik, closes: harga penutupan (null bila data kosong),
+// volumes: volume harian sejajar timestamps/closes (null bila data kosong).
+// Field volumes ditambahkan untuk skor scalping; format lama tidak berubah.
 
 const YAHOO_HOSTS = [
   'https://query1.finance.yahoo.com',
@@ -58,6 +60,10 @@ module.exports = async (req, res) => {
       const closes = (result.indicators?.quote?.[0]?.close || []).map((v) =>
         v == null ? null : v
       );
+      // Volume harian sejajar timestamps/closes, untuk rata-rata volume scalping.
+      const volumes = (result.indicators?.quote?.[0]?.volume || []).map((v) =>
+        v == null ? null : v
+      );
       // chartPreviousClose Yahoo untuk range >1d adalah harga awal rentang,
       // bukan penutupan kemarin. Utamakan turunan dari change% resmi Yahoo
       // (sama seperti api/quote.js), fallback ke bar kedua terakhir.
@@ -82,6 +88,7 @@ module.exports = async (req, res) => {
         previousClose,
         timestamps,
         closes,
+        volumes,
       });
     } catch (e) {
       lastErr = e;

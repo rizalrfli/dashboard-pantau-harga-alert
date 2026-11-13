@@ -5,137 +5,238 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pantau Saham IDX — Harga &amp; Alert</title>
 <style>
-  :root{--bg:#0b0f14;--panel:#111827;--panel2:#0f172a;--line:#1e293b;--text:#e5e7eb;--muted:#94a3b8;--green:#22c55e;--red:#ef4444;--amber:#f59e0b;--blue:#38bdf8;--chip:#1f2937}
+  /* ---- Gaya Extej: tema terang, kartu putih, aksen oranye ---- */
+  :root{--bg:#f6f7f9;--panel:#ffffff;--panel2:#fff7ed;--line:#e5e7eb;--text:#0f172a;--muted:#64748b;--green:#16a34a;--red:#dc2626;--amber:#d97706;--blue:#2563eb;--orange:#ff7a1a;--orange-dark:#ea580c;--chip:#f1f5f9}
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--text);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;line-height:1.5}
-  header{position:sticky;top:0;background:#0b0f14ee;backdrop-filter:blur(6px);border-bottom:1px solid var(--line);z-index:5}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.5}
+  .app{display:flex;min-height:100vh}
+  /* ---- Sidebar ---- */
+  .sidebar{width:232px;flex-shrink:0;background:#fff;border-right:1px solid var(--line);padding:18px 14px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:4px}
+  .logo{display:flex;gap:10px;align-items:center;padding:4px 6px 14px;border-bottom:1px solid var(--line);margin-bottom:8px}
+  .logo-mark{width:38px;height:38px;border-radius:10px;background:var(--orange);color:#fff;font-weight:900;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+  .logo b{display:block;font-size:17px;letter-spacing:.02em}
+  .logo span{display:block;font-size:11px;color:var(--muted)}
+  .side-label{font-size:11px;color:#94a3b8;letter-spacing:.08em;padding:10px 10px 4px;font-weight:700}
+  .side-nav{display:flex;flex-direction:column;gap:4px}
+  .side-btn{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:11px 12px;border:none;border-radius:12px;background:transparent;color:#334155;font-weight:600;font-size:14px;cursor:pointer;font-family:inherit}
+  .side-btn.active{background:var(--orange);color:#fff}
+  .side-btn:hover:not(.active){background:#fff7ed}
+  .side-foot{margin-top:auto;font-size:11px;color:#94a3b8;padding:10px;line-height:1.6}
+  /* ---- Area utama ---- */
+  .main{flex:1;min-width:0}
+  .topbar{position:sticky;top:0;background:rgba(246,247,249,.92);backdrop-filter:blur(6px);border-bottom:1px solid var(--line);z-index:5}
+  .topbar-inner{display:flex;gap:10px;align-items:center;padding:12px 16px;max-width:1020px;margin:0 auto}
+  #topSearch{flex:1;min-width:120px}
+  .user-chip{display:flex;gap:8px;align-items:center;flex-shrink:0}
+  .avatar{width:36px;height:36px;border-radius:50%;background:var(--orange);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px}
+  .user-chip b{display:block;font-size:13px;line-height:1.2}
+  .user-chip span{display:block;font-size:11px;color:var(--muted);line-height:1.2}
   .wrap{max-width:1020px;margin:0 auto;padding:14px 16px}
-  h1{font-size:20px;margin:0}
+  .page-head{padding-top:8px}
+  h1{font-size:24px;margin:0;color:#0f172a}
   .sub{color:var(--muted);font-size:13px}
-  .ihsg{display:flex;gap:16px;flex-wrap:wrap;align-items:baseline;margin-top:10px;padding:10px 12px;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+  #lastUpdate{margin-top:4px;font-weight:600;color:#334155}
+  /* ---- Kartu ringkasan (gaya Wallet) ---- */
+  .summary{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:14px;margin:16px 0}
+  .sum-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:0 1px 3px rgba(15,23,42,.06)}
+  .sum-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:700}
+  .sum-value{font-size:26px;font-weight:800;color:#0f172a;margin-top:4px}
+  .sum-sub{font-size:12px;color:var(--muted);margin-top:2px}
+  .ihsg{display:flex;gap:8px 14px;flex-wrap:wrap;align-items:baseline;margin-top:6px}
   .ihsg b{font-size:22px}
   .up{color:var(--green)} .down{color:var(--red)} .muted{color:var(--muted)}
   .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}
-  button,input,select{background:#111827;color:var(--text);border:1px solid #334155;border-radius:8px;padding:9px 12px;font:inherit;font-size:14px}
-  button{cursor:pointer;background:#1e293b}
-  button.primary{background:#0ea5e9;color:#fff;border-color:#0ea5e9}
-  button:hover{filter:brightness(1.15)}
+  button,input,select{background:#fff;color:var(--text);border:1px solid #d1d5db;border-radius:10px;padding:9px 12px;font:inherit;font-size:14px}
+  button{cursor:pointer}
+  button.primary{background:var(--orange);color:#fff;border-color:var(--orange)}
+  button:hover{filter:brightness(1.05)}
+  button.primary:hover{background:var(--orange-dark)}
   .tabs{display:flex;gap:6px;margin:6px 0 14px}
-  .tabs button.active{background:#0ea5e9;color:#fff;border-color:#0ea5e9}
-  .grid{display:grid;grid-template-columns:1fr;gap:10px}
+  .tabs button.active{background:var(--orange);color:#fff;border-color:var(--orange)}
+  .grid{display:grid;grid-template-columns:1fr;gap:12px}
   @media(min-width:760px){.grid{grid-template-columns:1fr 1fr}}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;cursor:pointer}
-  .card:hover{border-color:#38bdf8}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;cursor:pointer;box-shadow:0 1px 3px rgba(15,23,42,.05)}
+  .card:hover{border-color:var(--orange);box-shadow:0 2px 8px rgba(255,122,26,.15)}
   .card .sym{font-size:18px;font-weight:700}
   .card .name{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .price{font-size:22px;font-weight:700}
+  .price{font-size:22px;font-weight:800}
+  .price.up{color:var(--orange)}
   .row{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
   .mini{font-size:12px;color:var(--muted)}
-  .chip{display:inline-block;background:var(--chip);border:1px solid #334155;border-radius:999px;padding:4px 10px;margin:2px 4px 2px 0;cursor:pointer;font-size:13px}
-  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:12px}
+  .chip{display:inline-block;background:var(--chip);border:1px solid #e2e8f0;border-radius:999px;padding:4px 10px;margin:2px 4px 2px 0;cursor:pointer;font-size:13px;color:#334155}
+  .chip:hover{border-color:var(--orange);color:var(--orange-dark)}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:12px;box-shadow:0 1px 3px rgba(15,23,42,.05)}
   .hidden{display:none!important}
-  canvas{width:100%;height:220px;background:#0b1220;border:1px solid var(--line);border-radius:8px}
+  canvas{width:100%;height:220px;background:#fff;border:1px solid var(--line);border-radius:8px}
   .stat{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px}
   @media(min-width:760px){.stat{grid-template-columns:repeat(4,1fr)}}
-  .stat div{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px}
+  .stat div{background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:8px}
   .stat small{color:var(--muted);display:block}
   table{width:100%;border-collapse:collapse;font-size:14px}
   th,td{padding:8px 4px;border-bottom:1px solid var(--line);text-align:left}
   th{color:var(--muted);font-size:12px}
-  .alert-item,.trig{border-left:3px solid var(--amber);padding:8px 10px;margin:8px 0;background:var(--panel2);border-radius:6px}
-  .trig{border-color:var(--red)}
+  .alert-item,.trig{border-left:3px solid var(--amber);padding:8px 10px;margin:8px 0;background:#fffbeb;border-radius:6px}
+  .trig{border-color:var(--red);background:#fef2f2}
   footer{color:var(--muted);font-size:12px;margin:24px 0;text-align:center}
-  .empty{padding:24px;text-align:center;color:var(--muted);border:1px dashed #334155;border-radius:12px}
-  .err{background:#450a0a;border:1px solid #7f1d1d;color:#fecaca;padding:10px;border-radius:8px;margin:10px 0}
+  .empty{padding:24px;text-align:center;color:var(--muted);border:1px dashed #cbd5e1;border-radius:14px;background:#fff}
+  .err{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;padding:10px;border-radius:8px;margin:10px 0}
   form.inline{display:flex;gap:8px;flex-wrap:wrap;align-items:end}
   form.inline label{font-size:12px;color:var(--muted);display:block}
   .del{background:none;border:none;color:var(--red);padding:2px 6px}
+  /* ---- Analisa AI ---- */
+  .badge{display:inline-block;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:700;white-space:nowrap}
+  .badge-bull{background:#dcfce7;color:#15803d;border:1px solid #bbf7d0}
+  .badge-bear{background:#fee2e2;color:#b91c1c;border:1px solid #fecaca}
+  .badge-neutral{background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0}
+  .badge-wns{background:#fef3c7;color:#92400e;border:1px solid #fde68a}
+  .scorebar{height:10px;background:#e5e7eb;border-radius:999px;overflow:hidden;margin:6px 0}
+  .scorebar i{display:block;height:100%;border-radius:999px}
+  .ai-panel{margin-top:12px;border:1px solid var(--line);border-radius:14px;padding:16px;background:#fff7ed}
+  .ai-panel h3{margin:0 0 8px;font-size:16px}
+  .ai-panel ul{margin:8px 0;padding-left:20px;font-size:13px}
+  .ai-panel li{margin-bottom:4px}
+  .ai-plan{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+  .ai-plan td{padding:6px 4px;border-bottom:1px solid var(--line)}
+  .ai-plan td:first-child{color:var(--muted);width:110px}
+  .tablewrap{overflow-x:auto;margin-top:10px}
+  .tablewrap table{min-width:760px}
+  .ai-summary{margin-top:12px}
+  @media(max-width:860px){
+    .app{flex-direction:column}
+    .sidebar{width:100%;height:auto;position:static;padding:10px 12px}
+    .side-nav{flex-direction:row;overflow-x:auto;gap:6px}
+    .side-btn{width:auto;white-space:nowrap}
+    .side-foot{display:none}
+    .logo{border-bottom:none;padding-bottom:4px}
+    .summary{grid-template-columns:1fr}
+    .user-chip div{display:none}
+  }
 </style>
 </head>
 <body>
-<header><div class="wrap">
-  <h1>📈 Pantau Saham IDX</h1>
-  <div class="sub">Harga &amp; alert — data Yahoo Finance • refresh otomatis 60 detik</div>
-  <div class="ihsg" id="ihsg"><span class="muted">Memuat IHSG…</span></div>
-</div></header>
+<div class="app">
+  <aside class="sidebar">
+    <div class="logo"><span class="logo-mark">C</span><div><b>CIBUNG</b><span>Pantau Saham IDX</span></div></div>
+    <div class="side-label">MENU</div>
+    <nav class="side-nav">
+      <button class="side-btn active" data-tab="watch">📈 Watchlist</button>
+      <button class="side-btn" data-tab="ai">🤖 Analisa AI</button>
+      <button class="side-btn" data-tab="alerts">🔔 Alert <span id="alertCountSide"></span></button>
+      <button class="side-btn" data-tab="port">💼 Portofolio</button>
+    </nav>
+    <div class="side-foot">Data Yahoo Finance<br>Bisa delay ~15 menit<br>Bukan rekomendasi investasi</div>
+  </aside>
 
-<main class="wrap">
-  <div class="toolbar">
-    <button id="btnRefresh" class="primary">↻ Refresh sekarang</button>
-    <button id="btnNotif">🔔 Aktifkan notifikasi</button>
-    <span class="muted" id="lastUpdate" style="align-self:center;font-size:13px"></span>
-  </div>
-  <div id="globalError" class="err hidden"></div>
+  <div class="main">
+    <div class="topbar"><div class="topbar-inner">
+      <input id="topSearch" placeholder="Cari kode / nama saham…" autocomplete="off">
+      <button id="btnRefresh" class="primary">↻ Refresh</button>
+      <div class="user-chip"><span class="avatar">R</span><div><b>Rizal</b><span>Trader IDX</span></div></div>
+    </div></div>
 
-  <div class="tabs">
-    <button data-tab="watch" class="active">Watchlist</button>
-    <button data-tab="alerts">Alert <span id="alertCount"></span></button>
-    <button data-tab="port">Portofolio</button>
-  </div>
-
-  <!-- WATCHLIST -->
-  <section id="tab-watch">
-    <form class="inline" id="addForm">
-      <div><label>Kode saham</label><input id="addCode" placeholder="BBCA" maxlength="6" style="text-transform:uppercase;width:110px"></div>
-      <button type="submit" class="primary">+ Tambah</button>
-    </form>
-    <p class="sub">Populer: <span id="chips"></span></p>
-    <div id="watchLoading" class="empty">Memuat harga…</div>
-    <div id="watchEmpty" class="empty hidden">Watchlist kosong. Tambah kode saham di atas, misalnya BBCA.</div>
-    <div class="grid" id="watchGrid"></div>
-
-    <div id="detail" class="panel hidden">
-      <div class="row"><h2 id="detailTitle" style="margin:0;font-size:18px">Detail</h2><button id="detailClose">✕ Tutup</button></div>
-      <div style="margin:10px 0">
-        <button data-range="1mo">1 bln</button>
-        <button data-range="3mo" class="primary">3 bln</button>
-        <button data-range="6mo">6 bln</button>
+    <main class="wrap">
+      <div class="page-head">
+        <h1>Pantau Saham IDX</h1>
+        <div class="sub">Harga &amp; alert + analisa AI — data Yahoo Finance • refresh otomatis 60 detik</div>
+        <div id="lastUpdate" class="sub"></div>
       </div>
-      <canvas id="chart" width="900" height="220"></canvas>
-      <div class="stat" id="detailStats"></div>
-      <p class="mini" id="detailNote"></p>
-    </div>
-  </section>
+      <div id="globalError" class="err hidden"></div>
 
-  <!-- ALERTS -->
-  <section id="tab-alerts" class="hidden">
-    <div class="panel">
-      <h2 style="margin-top:0">Buat alert</h2>
-      <form class="inline" id="alertForm">
-        <div><label>Kode</label><input id="alCode" placeholder="BBCA" maxlength="6" style="text-transform:uppercase;width:100px"></div>
-        <div><label>Jenis</label><select id="alType"><option value="above">Harga ≥ (di atas)</option><option value="below">Harga ≤ (di bawah)</option><option value="pct_up">Naik ≥ % harian</option><option value="pct_down">Turun ≥ % harian</option></select></div>
-        <div><label>Nilai (Rp / %)</label><input id="alValue" type="number" step="any" placeholder="5500" style="width:120px"></div>
-        <button type="submit" class="primary">Simpan alert</button>
-      </form>
-    </div>
-    <h3>Alert aktif</h3>
-    <div id="alertList"></div>
-    <h3>Alert yang terpicu</h3>
-    <div id="trigList"><p class="muted">Belum ada alert yang terpicu.</p></div>
-  </section>
+      <section class="summary">
+        <div class="sum-card">
+          <div class="sum-label">IHSG • Indeks Harga Saham Gabungan</div>
+          <div id="ihsg"><span class="muted">Memuat IHSG…</span></div>
+        </div>
+        <div class="sum-card">
+          <div class="sum-label">✅ Boleh masuk hari ini</div>
+          <div class="sum-value" id="sumMasuk">—</div>
+          <div class="sum-sub" id="sumMasukSub">Klik 🤖 Analisa Semua</div>
+        </div>
+        <div class="sum-card">
+          <div class="sum-label">⚡ Cocok untuk scalping</div>
+          <div class="sum-value" id="sumScalp">—</div>
+          <div class="sum-sub" id="sumScalpSub">Klik 🤖 Analisa Semua</div>
+        </div>
+      </section>
 
-  <!-- PORTFOLIO -->
-  <section id="tab-port" class="hidden">
-    <div class="panel">
-      <h2 style="margin-top:0">Tambah posisi (manual)</h2>
-      <form class="inline" id="portForm">
-        <div><label>Kode</label><input id="pfCode" placeholder="BBCA" maxlength="6" style="text-transform:uppercase;width:100px"></div>
-        <div><label>Lot (1 lot = 100 lbr)</label><input id="pfLot" type="number" min="1" step="1" placeholder="10" style="width:90px"></div>
-        <div><label>Harga beli / lembar (Rp)</label><input id="pfPrice" type="number" min="1" step="any" placeholder="4900" style="width:130px"></div>
-        <button type="submit" class="primary">Simpan posisi</button>
-      </form>
-    </div>
-    <div class="panel" style="margin-top:12px">
-      <div class="row"><b>Total nilai &amp; P/L</b><b id="portTotal">—</b></div>
-      <div style="overflow-x:auto"><table>
-        <thead><tr><th>Kode</th><th>Lot</th><th>Beli</th><th>Terakhir</th><th>P/L</th><th></th></tr></thead>
-        <tbody id="portBody"></tbody>
-      </table></div>
-    </div>
-  </section>
+      <div class="toolbar">
+        <button id="btnNotif">🔔 Aktifkan notifikasi</button>
+        <button id="btnAnalyzeAll">🤖 Analisa Semua</button>
+      </div>
 
-  <footer>Data dari Yahoo Finance, bisa delay ~15 menit. Bukan rekomendasi investasi — selalu cek lagi sebelum membeli atau menjual saham.</footer>
-</main>
+      <div class="tabs">
+        <button data-tab="watch" class="active">Watchlist</button>
+        <button data-tab="alerts">Alert <span id="alertCount"></span></button>
+        <button data-tab="port">Portofolio</button>
+      </div>
+
+      <!-- WATCHLIST -->
+      <section id="tab-watch">
+        <form class="inline" id="addForm">
+          <div><label>Kode saham</label><input id="addCode" placeholder="BBCA" maxlength="6" style="text-transform:uppercase;width:110px"></div>
+          <button type="submit" class="primary">+ Tambah</button>
+        </form>
+        <p class="sub">Populer: <span id="chips"></span></p>
+        <div id="aiSummary" class="panel ai-summary hidden"></div>
+        <div id="watchLoading" class="empty">Memuat harga…</div>
+        <div id="watchEmpty" class="empty hidden">Watchlist kosong. Tambah kode saham di atas, misalnya BBCA.</div>
+        <div class="grid" id="watchGrid"></div>
+
+        <div id="detail" class="panel hidden">
+          <div class="row"><h2 id="detailTitle" style="margin:0;font-size:18px">Detail</h2><button id="detailClose">✕ Tutup</button></div>
+          <div style="margin:10px 0">
+            <button data-range="1mo">1 bln</button>
+            <button data-range="3mo" class="primary">3 bln</button>
+            <button data-range="6mo">6 bln</button>
+          </div>
+          <canvas id="chart" width="900" height="220"></canvas>
+          <div class="stat" id="detailStats"></div>
+          <p class="mini" id="detailNote"></p>
+          <div id="aiPanel" class="ai-panel hidden"></div>
+        </div>
+      </section>
+
+      <!-- ALERTS -->
+      <section id="tab-alerts" class="hidden">
+        <div class="panel">
+          <h2 style="margin-top:0">Buat alert</h2>
+          <form class="inline" id="alertForm">
+            <div><label>Kode</label><input id="alCode" placeholder="BBCA" maxlength="6" style="text-transform:uppercase;width:100px"></div>
+            <div><label>Jenis</label><select id="alType"><option value="above">Harga ≥ (di atas)</option><option value="below">Harga ≤ (di bawah)</option><option value="pct_up">Naik ≥ % harian</option><option value="pct_down">Turun ≥ % harian</option></select></div>
+            <div><label>Nilai (Rp / %)</label><input id="alValue" type="number" step="any" placeholder="5500" style="width:120px"></div>
+            <button type="submit" class="primary">Simpan alert</button>
+          </form>
+        </div>
+        <h3>Alert aktif</h3>
+        <div id="alertList"></div>
+        <h3>Alert yang terpicu</h3>
+        <div id="trigList"><p class="muted">Belum ada alert yang terpicu.</p></div>
+      </section>
+
+      <!-- PORTFOLIO -->
+      <section id="tab-port" class="hidden">
+        <div class="panel">
+          <h2 style="margin-top:0">Tambah posisi (manual)</h2>
+          <form class="inline" id="portForm">
+            <div><label>Kode</label><input id="pfCode" placeholder="BBCA" maxlength="6" style="text-transform:uppercase;width:100px"></div>
+            <div><label>Lot (1 lot = 100 lbr)</label><input id="pfLot" type="number" min="1" step="1" placeholder="10" style="width:90px"></div>
+            <div><label>Harga beli / lembar (Rp)</label><input id="pfPrice" type="number" min="1" step="any" placeholder="4900" style="width:130px"></div>
+            <button type="submit" class="primary">Simpan posisi</button>
+          </form>
+        </div>
+        <div class="panel" style="margin-top:12px">
+          <div class="row"><b>Total nilai &amp; P/L</b><b id="portTotal">—</b></div>
+          <div style="overflow-x:auto"><table>
+            <thead><tr><th>Kode</th><th>Lot</th><th>Beli</th><th>Terakhir</th><th>P/L</th><th></th></tr></thead>
+            <tbody id="portBody"></tbody>
+          </table></div>
+        </div>
+      </section>
+
+      <footer>Data dari Yahoo Finance, bisa delay ~15 menit. Bukan rekomendasi investasi — selalu cek lagi sebelum membeli atau menjual saham.</footer>
+    </main>
+  </div>
+</div>
 
 <script>
 const DEFAULT_WATCH = ["BBCA","BBRI","BMRI","BBNI","TLKM","ASII","GOTO","AMRT"];
@@ -155,14 +256,24 @@ let triggered = load(LS.trig, []);
 let portfolio = load(LS.port, []);
 let prices = {}; // symbol -> quote
 let selected = null, selectedRange = "3mo";
+let searchTerm = "";
 
 function showTab(name){
-  document.querySelectorAll(".tabs button").forEach(b=>b.classList.toggle("active", b.dataset.tab===name));
-  ["watch","alerts","port"].forEach(t=>$("#tab-"+t).classList.toggle("hidden", t!==name));
+  const target = name==="ai" ? "watch" : name;
+  document.querySelectorAll(".tabs button").forEach(b=>b.classList.toggle("active", b.dataset.tab===target));
+  document.querySelectorAll(".side-btn").forEach(b=>b.classList.toggle("active", b.dataset.tab===name));
+  ["watch","alerts","port"].forEach(t=>$("#tab-"+t).classList.toggle("hidden", t!==target));
   if(name==="port") renderPortfolio();
   if(name==="alerts") renderAlerts();
+  if(name==="ai"){
+    const el=$("#aiSummary");
+    if(el) el.scrollIntoView({behavior:"smooth", block:"start"});
+    if(!Object.keys(analysis).length) analyzeAll();
+  }
 }
 document.querySelectorAll(".tabs button").forEach(b=>b.addEventListener("click", ()=>showTab(b.dataset.tab)));
+document.querySelectorAll(".side-btn").forEach(b=>b.addEventListener("click", ()=>showTab(b.dataset.tab)));
+$("#topSearch").addEventListener("input", e=>{ searchTerm=e.target.value; renderWatch(); });
 
 async function apiQuote(symbols){
   const r = await fetch("/api/quote?symbols=" + symbols.map(encodeURIComponent).join(","));
@@ -189,7 +300,7 @@ async function refreshAll(){
       const delayMin = Math.max(0, Math.round((now.getTime()-latest)/60000));
       const el = $("#lastUpdate");
       el.textContent = `Data bursa per ${fmtTime(new Date(latest))} WIB • telat ${delayMin} mnt • dicek ${fmtTime(now)} WIB`;
-      el.style.color = delayMin > 15 ? "#f59e0b" : "";
+      el.style.color = delayMin > 15 ? "#d97706" : "";
       el.title = "marketTime terbaru dari Yahoo Finance; delay = jam sekarang minus jam data bursa";
     } else {
       $("#lastUpdate").textContent = "Terakhir dicek: " + fmtTime(now) + " WIB (jam data bursa tidak tersedia)";
@@ -213,18 +324,30 @@ function renderIhsg(){
 
 function renderWatch(){
   const grid = $("#watchGrid"); grid.innerHTML="";
-  $("#watchEmpty").classList.toggle("hidden", watch.length>0);
-  watch.forEach(code=>{
+  const term = (searchTerm||"").trim().toUpperCase();
+  const list = watch.filter(code=>{
+    if(!term) return true;
+    const q = prices[code+".JK"];
+    return code.includes(term) || (q?.longName||"").toUpperCase().includes(term);
+  });
+  const emptyEl = $("#watchEmpty");
+  emptyEl.classList.toggle("hidden", list.length>0);
+  if(!list.length){
+    emptyEl.textContent = term ? "Tidak ada saham yang cocok dengan pencarian." : "Watchlist kosong. Tambah kode saham di atas, misalnya BBCA.";
+  }
+  list.forEach(code=>{
     const sym = code+".JK", q = prices[sym];
     const div = document.createElement("div"); div.className="card";
     div.onclick = ()=>openDetail(code);
     if(!q){ div.innerHTML=`<div class="row"><span class="sym">${code}</span><button class="del" title="Hapus">✕</button></div><p class="muted">Harga belum tersedia — coba refresh.</p>`; }
     else{
       const cls=(q.changePercent||0)>=0?"up":"down";
+      const a=analysis[code];
       div.innerHTML=`<div class="row"><span class="sym">${code}</span><button class="del" title="Hapus">✕</button></div>
         <div class="name">${q.longName||""}</div>
-        <div class="row" style="margin-top:6px"><span class="price">${fmtRp(q.price)}</span><span class="${cls}"><b>${fmtPct(q.changePercent)}</b></span></div>
-        <div class="mini">Tertinggi ${fmtRp(q.dayHigh)} • Terendah ${fmtRp(q.dayLow)}<br>Volume ${fmtNum(q.volume)} • Prev close ${fmtRp(q.previousClose)}</div>`;
+        <div class="row" style="margin-top:6px"><span class="price ${cls}">${fmtRp(q.price)}</span><span class="${cls}"><b>${fmtPct(q.changePercent)}</b></span></div>
+        <div class="mini">Tertinggi ${fmtRp(q.dayHigh)} • Terendah ${fmtRp(q.dayLow)}<br>Volume ${fmtNum(q.volume)} • Prev close ${fmtRp(q.previousClose)}</div>
+        ${a ? `<div style="margin-top:8px">${verdictBadge(a)} ${suggestionBadge(a.suggestion)}</div>` : `<div class="mini" style="margin-top:8px">Belum dianalisa — klik "🤖 Analisa Semua" atau buka detail saham ini.</div>`}`;
     }
     div.querySelector(".del").onclick = e=>{ e.stopPropagation(); watch=watch.filter(c=>c!==code); save(LS.watch,watch); renderWatch(); refreshAll(); };
     grid.appendChild(div);
@@ -247,6 +370,7 @@ $("#addForm").addEventListener("submit", e=>{
   $("#addCode").value=""; renderWatch(); refreshAll();
 });
 $("#btnRefresh").addEventListener("click", refreshAll);
+$("#btnAnalyzeAll").addEventListener("click", analyzeAll);
 $("#btnNotif").addEventListener("click", async ()=>{
   if(!("Notification" in window)) return alert("Browser ini tidak mendukung notifikasi.");
   const p = await Notification.requestPermission();
@@ -270,20 +394,380 @@ function rsi(closes, period=14){
   if(avgL===0) return 100;
   return 100 - (100/(1+avgG/avgL));
 }
+// ---- Analisa AI (rule-based, transparan — dihitung di browser, tanpa API key) ----
+// SKOR 0-100, total dari 4 komponen:
+//   Tren +40      : harga vs MA20 (+12), harga vs MA50 (+12), MA20 vs MA50 (+16 golden cross).
+//                   Bila MA50 belum ada (data < 50 hari), harga vs MA20 saja (+28) + tren naik (+12).
+//   Momentum +30  : RSI di zona 45-65 (+12), MACD histogram positif (+10) dan naik (+8).
+//   Posisi harga +15: ruang ke resistance — makin jauh dari resistance makin besar
+//                   (+15 bila ruang >50% dari rentang support-resistance, +10 bila 25-50%,
+//                   +5 bila <25%, +12 bila sudah tembus resistance, +2 bila di bawah support).
+//   Perubahan harian +15: +15 bila naik ≥1%, +11 bila 0-1%, +7 bila -1-0%, +4 bila -2--1%, 0 bila <-2%.
+// Verdict: skor >=65 BULLISH, <=35 BEARISH, sisanya NETRAL.
+// Saran (4 kategori):
+//   Masuk            : BULLISH dan RSI < 70 — tren + momentum searah, harga belum overbought.
+//   Tunggu           : BULLISH tapi RSI >= 70 — sinyal bagus tapi harga ketinggian (overbought),
+//                      tunggu koreksi ke MA20. Bukan WNS: arahnya sudah jelas bullish.
+//   Wait and See (WNS): NETRAL / sinyal bertentangan / skor 40-60 — jangan masuk dulu,
+//                      pantau konfirmasi: tunggu harga tembus resistance / bertahan di atas MA20
+//                      atau RSI menguat, baru pertimbangkan masuk.
+//   Hindari          : BEARISH — tren dan momentum melemah, jangan masuk dulu.
+function ema(arr, n){
+  const out=[]; const k=2/(n+1); let prev=null;
+  for(let i=0;i<arr.length;i++){
+    if(arr[i]==null){ out.push(null); continue; }
+    if(prev==null){ prev=arr[i]; out.push(prev); continue; }
+    prev = arr[i]*k + prev*(1-k); out.push(prev);
+  }
+  return out;
+}
+function macd(closes){
+  const valid=closes.filter(v=>v!=null);
+  if(valid.length<35) return {macdLine:null, signal:null, histogram:null, prevHistogram:null};
+  const e12=ema(valid,12), e26=ema(valid,26);
+  const line=e12.map((v,i)=> v==null||e26[i]==null ? null : v-e26[i]);
+  const lineValid=line.filter(v=>v!=null);
+  const sigFull=ema(lineValid,9); // signal[j] sejajar lineValid[j]
+  const last=lineValid[lineValid.length-1];
+  const lastSig=sigFull[sigFull.length-1];
+  const prevHist = lineValid.length>=2 && sigFull.length>=2
+    ? lineValid[lineValid.length-2]-sigFull[sigFull.length-2] : null;
+  return {macdLine:last, signal:lastSig, histogram:(last!=null&&lastSig!=null)?last-lastSig:null, prevHistogram:prevHist};
+}
+function supportResistance(closes, n=20){
+  const valid=closes.filter(v=>v!=null).slice(-n);
+  if(!valid.length) return {support:null, resistance:null};
+  return {support:Math.min(...valid), resistance:Math.max(...valid)};
+}
+function analyzeStock(code, closes, quote){
+  const valid=(closes||[]).filter(v=>v!=null);
+  const price = quote?.price ?? valid[valid.length-1] ?? null;
+  const changePercent = quote?.changePercent ?? (quote?.previousClose && price!=null ? (price-quote.previousClose)/quote.previousClose*100 : null);
+  const reasons=[];
+  if(!valid.length || price==null) return {score:50, verdict:"NETRAL", trend:"Tidak diketahui", momentum:"Tidak diketahui", reasons:["Data harga belum cukup untuk dianalisa."], suggestion:"Wait and See (WNS)", entry:"Pantau dulu — data belum cukup", stopLoss:null, target1:null, target2:null, riskNote:"Wait and See (WNS): jangan masuk dulu, pantau konfirmasi: tunggu harga tembus resistance / bertahan di atas MA20 atau RSI menguat, baru pertimbangkan masuk.", rsi:null, ma20:null, ma50:null, macdHist:null, support:null, resistance:null, price, changePercent};
+  // Data kurang dari 20 hari bursa: MA20 belum terbentuk, RSI/MACD belum bisa
+  // diandalkan — jangan dipaksa jadi BULLISH/BEARISH, hasilnya WNS.
+  if(valid.length<20) return {score:50, verdict:"NETRAL", trend:"Tidak diketahui", momentum:"Tidak diketahui", reasons:[`Data hanya ${valid.length} hari bursa (butuh minimal 20 hari) — MA20/RSI/MACD belum bisa diandalkan.`], suggestion:"Wait and See (WNS)", entry:"Pantau dulu — data belum cukup", stopLoss:null, target1:null, target2:null, riskNote:"Wait and See (WNS): jangan masuk dulu, pantau konfirmasi: tunggu harga tembus resistance / bertahan di atas MA20 atau RSI menguat, baru pertimbangkan masuk.", rsi:null, ma20:null, ma50:null, macdHist:null, support:null, resistance:null, price, changePercent};
+  const ma20Arr=sma(closes,20), ma50Arr=sma(closes,50);
+  const ma20=ma20Arr.filter(v=>v!=null).pop() ?? null;
+  const ma50=ma50Arr.filter(v=>v!=null).pop() ?? null;
+  const rsiVal=rsi(valid);
+  const m=macd(closes);
+  const {support, resistance}=supportResistance(closes,20);
+
+  // --- Skor: tren (max 40) ---
+  // Selisih harus bermakna (>1%) baru dapat poin penuh — harga yang cuma
+  // 0,2% di atas MA datar tidak boleh dihitung sebagai uptrend.
+  let trendScore=0;
+  const gap=(p,m)=> m ? (p-m)/m : 0;
+  if(ma50!=null){
+    const g20=gap(price,ma20), g50=gap(price,ma50), gCross=gap(ma20,ma50);
+    trendScore += g20>0.01 ? 12 : g20>0 ? 6 : 0;
+    trendScore += g50>0.01 ? 12 : g50>0 ? 6 : 0;
+    trendScore += gCross>0.01 ? 16 : gCross>0 ? 8 : 0;
+  } else if(ma20!=null){
+    trendScore += gap(price,ma20)>0.01 ? 28 : gap(price,ma20)>0 ? 14 : 10;
+    const last=valid[valid.length-1], prev=valid[valid.length-2];
+    if(last!=null && prev!=null && last>prev) trendScore+=12;
+  }
+  // --- Skor: momentum (max 30) ---
+  let momScore=0;
+  if(rsiVal!=null){
+    if(rsiVal>=45 && rsiVal<=65) momScore+=12;
+    else if((rsiVal>=30 && rsiVal<45) || (rsiVal>65 && rsiVal<70)) momScore+=7;
+    else if(rsiVal<30) momScore+=4;
+    else momScore+=2; // >=70 overbought
+  }
+  if(m.histogram!=null){
+    if(m.histogram>0) momScore+=10;
+    if(m.prevHistogram!=null && m.histogram>m.prevHistogram) momScore+=8;
+    else if(m.prevHistogram!=null) momScore+=2;
+    else momScore+=4;
+  }
+  // --- Skor: posisi harga (max 15) ---
+  let posScore=7;
+  if(support!=null && resistance!=null && resistance>support){
+    if(price>=resistance) posScore=12;
+    else if(price<support) posScore=2;
+    else {
+      const room=(resistance-price)/(resistance-support);
+      posScore = room>0.5 ? 15 : room>=0.25 ? 10 : 5;
+    }
+  }
+  // --- Skor: perubahan harian (max 15) ---
+  let chgScore=7;
+  if(changePercent!=null){
+    chgScore = changePercent>=1 ? 15 : changePercent>=0 ? 11 : changePercent>=-1 ? 7 : changePercent>=-2 ? 4 : 0;
+  }
+  const score=Math.max(0, Math.min(100, Math.round(trendScore+momScore+posScore+chgScore)));
+  const verdict = score>=65 ? "BULLISH" : score<=35 ? "BEARISH" : "NETRAL";
+  const trend = (ma20!=null && ma50!=null)
+    ? (price>ma20 && ma20>ma50 ? "Naik (uptrend)" : price<ma20 && ma20<ma50 ? "Turun (downtrend)" : "Mendatar / campuran")
+    : (ma20!=null && price>ma20 ? "Naik (di atas MA20)" : ma20!=null ? "Turun (di bawah MA20)" : "Tidak diketahui");
+  const momentum = (m.histogram!=null && m.prevHistogram!=null)
+    ? (m.histogram>0 && m.histogram>m.prevHistogram ? "Menguat" : m.histogram<0 && m.histogram<m.prevHistogram ? "Melemah" : "Campuran")
+    : "Tidak diketahui";
+
+  // --- Alasan (Bahasa Indonesia, menyebut angka sebenarnya) ---
+  if(ma20!=null && ma50!=null){
+    reasons.push(`Harga ${fmtRp(price)} ${price>ma20?"di atas":"di bawah"} MA20 ${fmtRp(ma20)} dan ${price>ma50?"di atas":"di bawah"} MA50 ${fmtRp(ma50)} — MA20 ${ma20>ma50?"di atas MA50 (golden cross, tren naik)":"di bawah MA50 (death cross, tren turun)"}.`);
+  } else if(ma20!=null){
+    reasons.push(`Harga ${fmtRp(price)} ${price>ma20?"di atas":"di bawah"} MA20 ${fmtRp(ma20)} (MA50 belum tersedia, data kurang dari 50 hari).`);
+  }
+  if(rsiVal!=null){
+    reasons.push(`RSI (14) ${rsiVal.toFixed(1)} — ${rsiVal>=70?"overbought, harga sudah terlalu tinggi":rsiVal<=30?"oversold, harga sudah terlalu murah":rsiVal>=45&&rsiVal<=65?"di zona netral-sehat, momentum terjaga":"di zona lemah"}.`);
+  }
+  if(m.histogram!=null){
+    reasons.push(`MACD histogram ${m.histogram>=0?"+":""}${Math.round(m.histogram)} (${m.histogram>0?"positif":"negatif"})${m.prevHistogram!=null?(m.histogram>m.prevHistogram?" dan naik dari "+Math.round(m.prevHistogram):" dan turun dari "+Math.round(m.prevHistogram)):""} — garis MACD ${fmtRp(m.macdLine)} vs sinyal ${fmtRp(m.signal)}.`);
+  }
+  if(support!=null && resistance!=null){
+    if(price>=resistance){
+      reasons.push(`Harga ${fmtRp(price)} sudah di resistance tertinggi 20 hari (${fmtRp(resistance)}) — tembus ke atas berarti sinyal lanjut naik, gagal tembus berarti rawan koreksi. Support terdekat ${fmtRp(support)}.`);
+    } else {
+      const roomPct = resistance>support ? ((resistance-price)/(resistance-support)*100) : 0;
+      reasons.push(`Harga ${fmtRp(price)}, support terdekat ${fmtRp(support)}, resistance terdekat ${fmtRp(resistance)} — ruang naik ke resistance ${roomPct.toFixed(0)}%.`);
+    }
+  }
+  if(changePercent!=null){
+    reasons.push(`Perubahan hari ini ${fmtPct(changePercent)} vs prev close ${fmtRp(quote?.previousClose)}.`);
+  }
+
+  // --- Saran + rencana entry ---
+  const range = (support!=null && resistance!=null && resistance>support) ? resistance-support : null;
+  // Stop loss = support terdekat, tapi hanya bila support itu benar-benar di
+  // bawah harga (minimal 1%) dan tidak terlalu jauh (maks 7%); bila tidak,
+  // pakai -3% dari harga. Stop loss tidak boleh sama dengan harga masuk.
+  const stopFallback = price!=null ? Math.round(price*0.97) : null; // -3% bila support jauh
+  let stopLoss = (support!=null && price!=null && support < price*0.99 && (price-support)/price<=0.07)
+    ? support : stopFallback;
+  let suggestion, entry, riskNote, target1, target2;
+  if(verdict==="BULLISH" && rsiVal!=null && rsiVal>=70){
+    suggestion="Tunggu";
+    entry=`Tunggu koreksi ke MA20 ${fmtRp(ma20)}`;
+    target1 = resistance;
+    target2 = (resistance!=null && range!=null) ? Math.round(resistance + range*0.5) : null;
+    riskNote="Tunggu: sinyalnya sudah bagus (bullish) tapi RSI ≥70, harga ketinggian — jangan kejar harga, tunggu koreksi ke MA20. Ini beda dengan Wait and See (WNS): 'Tunggu' dipakai saat arah sudah jelas bullish tapi harga terlalu tinggi, sedangkan WNS dipakai saat sinyal masih bertentangan/netral dan belum ada konfirmasi arah.";
+  } else if(verdict==="BULLISH"){
+    suggestion="Masuk";
+    entry=(resistance!=null && resistance>price) ? `${fmtRp(price)} – ${fmtRp(resistance)}` : `${fmtRp(price)} (sudah di resistance, masuk saat tembus ke atas)`;
+    target1 = resistance;
+    target2 = (resistance!=null && range!=null) ? Math.round(resistance + range*0.5) : null;
+    riskNote="Masuk: tren dan momentum searah ke atas, harga belum overbought. Tetap pasang stop loss dan jangan pakai seluruh modal dalam satu saham.";
+  } else if(verdict==="BEARISH"){
+    suggestion="Hindari";
+    entry="— (jangan masuk dulu)";
+    // Bearish: stop loss = resistance (tembus ke atas = tesis bearish batal),
+    // target = support dan kelanjutannya ke bawah.
+    stopLoss = resistance ?? stopFallback;
+    target1 = support;
+    target2 = (support!=null && range!=null) ? Math.round(support - range*0.5) : null;
+    riskNote="Hindari: tren dan momentum melemah, harga di bawah MA20/MA50. Masuk hanya bila ada pembalikan terkonfirmasi (tembus resistance / MA20 dengan volume).";
+  } else {
+    suggestion="Wait and See (WNS)";
+    entry=`Pantau dulu — masuk bila tembus ${fmtRp(resistance)} atau bertahan di atas MA20 ${fmtRp(ma20)}`;
+    target1 = resistance;
+    target2 = (resistance!=null && range!=null) ? Math.round(resistance + range*0.5) : null;
+    riskNote="Wait and See (WNS): jangan masuk dulu, pantau konfirmasi: tunggu harga tembus resistance / bertahan di atas MA20 atau RSI menguat, baru pertimbangkan masuk. Ini beda dengan 'Tunggu': WNS dipakai saat sinyal masih bertentangan/netral (skor 40-60), sedangkan 'Tunggu' dipakai saat sudah bullish tapi RSI ≥70 (overbought) dan menunggu koreksi ke MA20.";
+  }
+  return {score, verdict, trend, momentum, reasons, suggestion, entry, stopLoss, target1, target2, riskNote,
+    rsi:rsiVal, ma20, ma50, macdHist:m.histogram, macdLine:m.macdLine, signal:m.signal, support, resistance, price, changePercent};
+}
+// ---- Skor scalping (terpisah dari skor analisa utama, 0-100) ----
+//   Range harian +30 : (high-low)/prevClose >=3% +30, 2-3% +25, 1,5-2% +18, <1,5% tidak lolos.
+//   Likuiditas +25   : volume >=20 jt & turnover >=Rp20 M +25, >=5 jt & >=Rp5 M +18, di bawah itu +5.
+//   RSI +20          : 45-65 +20, 40-45/65-70 +10, di luar itu 0.
+//   MACD +15         : histogram >0 +15, <=0 0.
+//   Di atas MA20 +10 : harga > MA20 +10, <= MA20 0.
+// Lolos scalping HANYA bila SEMUA syarat terpenuhi: range >=1,5%, RSI 45-65,
+// MACD positif, harga di atas MA20, volume >=5 jt dan turnover >=Rp5 M.
+// Volume rata-rata dihitung dari volumes chart 20 hari terakhir; bila volumes
+// tidak tersedia, fallback ke volume hari ini dari quote.
+function analyzeScalping(code, volumes, quote, ai){
+  const price = ai?.price ?? quote?.price ?? null;
+  const prevClose = quote?.previousClose ?? null;
+  const volume = quote?.volume ?? null;
+  const turnover = (price!=null && volume!=null) ? price*volume : null;
+  const rangePct = (quote?.dayHigh!=null && quote?.dayLow!=null && prevClose)
+    ? (quote.dayHigh-quote.dayLow)/prevClose*100 : null;
+  const vols=(volumes||[]).filter(v=>v!=null).slice(-20);
+  const avgVolume = vols.length ? Math.round(vols.reduce((s,v)=>s+v,0)/vols.length) : null;
+  let score=0;
+  if(rangePct!=null) score += rangePct>=3 ? 30 : rangePct>=2 ? 25 : rangePct>=1.5 ? 18 : 0;
+  if(volume!=null && turnover!=null) score += (volume>=20000000 && turnover>=20000000000) ? 25 : (volume>=5000000 && turnover>=5000000000) ? 18 : 5;
+  if(ai?.rsi!=null) score += (ai.rsi>=45 && ai.rsi<=65) ? 20 : ((ai.rsi>=40 && ai.rsi<45)||(ai.rsi>65 && ai.rsi<=70)) ? 10 : 0;
+  if(ai?.macdHist!=null && ai.macdHist>0) score+=15;
+  if(ai?.ma20!=null && price!=null && price>ai.ma20) score+=10;
+  const eligible = rangePct!=null && rangePct>=1.5
+    && ai?.rsi!=null && ai.rsi>=45 && ai.rsi<=65
+    && ai?.macdHist!=null && ai.macdHist>0
+    && ai?.ma20!=null && price!=null && price>ai.ma20
+    && volume!=null && volume>=5000000 && turnover!=null && turnover>=5000000000;
+  const parts=[];
+  if(rangePct!=null){
+    parts.push(rangePct>=3
+      ? `Range ${rangePct.toFixed(1)}% — gerak besar, cepat naik-turun: hati-hati, jangan kejar harga, pakai stop loss ketat.`
+      : rangePct>=1.5
+      ? `Range ${rangePct.toFixed(1)}% — cukup gerak untuk scalping, pakai stop loss ketat.`
+      : `Range ${rangePct.toFixed(1)}% — terlalu kecil untuk scalping (butuh minimal 1,5%).`);
+  }
+  if(volume!=null){
+    const volJt=(volume/1000000).toFixed(1);
+    parts.push(avgVolume!=null
+      ? `Volume ${volJt} jt, ${volume>=avgVolume?"di atas":"di bawah"} rata-rata ${(avgVolume/1000000).toFixed(1)} jt — likuiditas ${volume>=avgVolume?"bagus":"biasa saja"}.`
+      : `Volume ${volJt} jt hari ini.`);
+  }
+  if(!eligible){
+    const why=[];
+    if(rangePct==null) why.push("range harian tidak tersedia");
+    else if(rangePct<1.5) why.push(`range harian cuma ${rangePct.toFixed(1)}% (<1,5%)`);
+    if(ai?.rsi==null) why.push("RSI tidak tersedia");
+    else if(ai.rsi<45||ai.rsi>65) why.push(`RSI ${ai.rsi.toFixed(1)} di luar 45-65`);
+    if(ai?.macdHist==null || ai.macdHist<=0) why.push("MACD tidak positif");
+    if(!(ai?.ma20!=null && price!=null && price>ai.ma20)) why.push("harga tidak di atas MA20");
+    if(volume==null || volume<5000000 || turnover==null || turnover<5000000000) why.push("likuiditas kurang (volume/turnover kecil)");
+    parts.push("Tidak lolos: "+why.join("; ")+".");
+  }
+  return {eligible, score, rangePct, volume, avgVolume, turnover, note:parts.join(" ")};
+}
+const fmtVol = n => n==null ? "—" : (n>=1000000 ? (n/1000000).toFixed(1)+" jt" : Math.round(n).toLocaleString("id-ID"));
+const fmtTurn = n => n==null ? "—" : "Rp" + (n>=1000000000 ? (n/1000000000).toFixed(1)+" M" : Math.round(n).toLocaleString("id-ID"));
+function verdictBadge(a){
+  if(!a) return "";
+  const cls = a.verdict==="BULLISH" ? "badge-bull" : a.verdict==="BEARISH" ? "badge-bear" : "badge-neutral";
+  return `<span class="badge ${cls}">${a.verdict} ${a.score}</span>`;
+}
+function suggestionBadge(s){
+  const cls = s==="Masuk" ? "badge-bull" : s==="Hindari" ? "badge-bear" : s==="Wait and See (WNS)" ? "badge-wns" : "badge-neutral";
+  return `<span class="badge ${cls}">${s}</span>`;
+}
+function renderAiPanel(code, a){
+  const el=$("#aiPanel");
+  if(!a){ el.classList.add("hidden"); el.innerHTML=""; return; }
+  const cls = a.verdict==="BULLISH" ? "badge-bull" : a.verdict==="BEARISH" ? "badge-bear" : "badge-neutral";
+  const barColor = a.verdict==="BULLISH" ? "#16a34a" : a.verdict==="BEARISH" ? "#dc2626" : "#94a3b8";
+  el.classList.remove("hidden");
+  el.innerHTML = `
+    <h3>🤖 Analisa AI — ${code}</h3>
+    <div class="row"><span class="badge ${cls}" style="font-size:14px">${a.verdict}</span><b>Skor ${a.score}/100</b><span>${suggestionBadge(a.suggestion)}</span></div>
+    <div class="scorebar"><i style="width:${a.score}%;background:${barColor}"></i></div>
+    <div class="mini">Tren: ${a.trend} • Momentum: ${a.momentum}</div>
+    <ul>${a.reasons.map(r=>`<li>${r}</li>`).join("")}</ul>
+    <table class="ai-plan">
+      <tr><td>Saran</td><td><b>${a.suggestion}</b></td></tr>
+      <tr><td>Entry</td><td>${a.entry}</td></tr>
+      <tr><td>Stop loss</td><td>${fmtRp(a.stopLoss)}</td></tr>
+      <tr><td>Target 1</td><td>${fmtRp(a.target1)}</td></tr>
+      <tr><td>Target 2</td><td>${fmtRp(a.target2)}</td></tr>
+    </table>
+    <p class="mini" style="margin-top:8px">${a.riskNote}</p>
+    <p class="mini">Analisa rule-based (MA20/MA50, RSI, MACD, support/resistance) dari data Yahoo Finance — bukan rekomendasi investasi dan bukan prediksi pasti.</p>`;
+}
+let analysis = {}; // kode -> hasil analyzeStock (dari Analisa Semua / detail)
+async function analyzeAll(){
+  const btn=$("#btnAnalyzeAll");
+  if(!watch.length){ alert("Watchlist kosong — tambah saham dulu."); return; }
+  btn.disabled=true;
+  const panel=$("#aiSummary");
+  panel.classList.remove("hidden");
+  const rows=[];
+  for(let i=0;i<watch.length;i++){
+    const code=watch[i];
+    btn.textContent=`🤖 Menganalisa… ${i+1}/${watch.length} (${code})`;
+    panel.innerHTML=`<b>🤖 Analisa Semua</b><p class="muted">Menganalisa ${code} (${i+1}/${watch.length})…</p>`;
+    try{
+      const r=await fetch(`/api/chart?symbol=${code}.JK&range=3mo`);
+      if(!r.ok) throw new Error("HTTP "+r.status);
+      const d=await r.json();
+      const a=analyzeStock(code, d.closes||[], prices[code+".JK"]);
+      analysis[code]=a;
+      const scalp=analyzeScalping(code, d.volumes||[], prices[code+".JK"], a);
+      rows.push({code, a, scalp});
+    }catch(e){ console.warn("analisa gagal", code, e); }
+  }
+  btn.disabled=false; btn.textContent="🤖 Analisa Semua";
+  if(!rows.length){ panel.innerHTML="<b>🤖 Analisa Semua</b><p class='muted'>Gagal menganalisa semua saham — coba refresh lalu ulangi.</p>"; return; }
+  rows.sort((x,y)=>y.a.score-x.a.score);
+  const bull=rows.filter(r=>r.a.verdict==="BULLISH").length;
+  const bear=rows.filter(r=>r.a.verdict==="BEARISH").length;
+  const net=rows.length-bull-bear;
+  const best=rows[0];
+  // --- 1) Saham yang boleh masuk hari ini (kriteria ketat, jangan dipaksa) ---
+  const bolehMasuk=rows.filter(({a})=>
+    a.verdict==="BULLISH" && a.score>=65
+    && a.rsi!=null && a.rsi>=40 && a.rsi<=65
+    && a.ma20!=null && a.ma50!=null && a.price>a.ma20 && a.price>a.ma50
+    && a.macdHist!=null && a.macdHist>0
+    && (a.changePercent??0)>=0
+  ).sort((x,y)=>y.a.score-x.a.score);
+  // --- 2) Cocok untuk scalping (skor scalping terpisah) ---
+  const scalpers=rows.filter(r=>r.scalp?.eligible).sort((x,y)=>y.scalp.score-x.scalp.score);
+  // --- Kartu ringkasan di atas ---
+  const sm=$("#sumMasuk"), ss=$("#sumScalp");
+  if(sm){ sm.textContent = bolehMasuk.length ? bolehMasuk.length + " saham" : "0 saham"; }
+  const sms=$("#sumMasukSub"); if(sms) sms.textContent = bolehMasuk.length ? bolehMasuk.map(r=>r.code).join(", ") : "Tidak ada yang lolos hari ini";
+  if(ss){ ss.textContent = scalpers.length ? scalpers.length + " saham" : "0 saham"; }
+  const sss=$("#sumScalpSub"); if(sss) sss.textContent = scalpers.length ? scalpers.map(r=>r.code).join(", ") : "Tidak ada yang cocok hari ini";
+  panel.innerHTML = `
+    <b>🤖 Analisa Semua — ${rows.length} saham</b>
+    <p class="muted">${bull} bullish, ${net} netral, ${bear} bearish — paling kuat ${best.code} (skor ${best.a.score}, ${best.a.verdict}, saran: ${best.a.suggestion}). Saran "Wait and See (WNS)" = sinyal masih bertentangan/netral, jangan masuk dulu, tunggu konfirmasi tembus resistance/MA20; "Tunggu" = sudah bullish tapi RSI ≥70, tunggu koreksi ke MA20.</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Kode</th><th>Harga</th><th>%</th><th>RSI</th><th>MA20 / MA50</th><th>MACD</th><th>Skor</th><th>Arah</th><th>Saran</th></tr></thead>
+      <tbody>${rows.map(({code,a})=>`<tr>
+        <td><b>${code}</b></td>
+        <td>${fmtRp(a.price)}</td>
+        <td class="${(a.changePercent||0)>=0?"up":"down"}">${fmtPct(a.changePercent)}</td>
+        <td>${a.rsi==null?"—":a.rsi.toFixed(1)}</td>
+        <td>${fmtRp(a.ma20)} / ${fmtRp(a.ma50)}</td>
+        <td>${a.macdHist==null?"—":(a.macdHist>=0?"+":"")+Math.round(a.macdHist)}</td>
+        <td><b>${a.score}</b></td>
+        <td>${verdictBadge(a)}</td>
+        <td>${suggestionBadge(a.suggestion)}</td>
+      </tr>`).join("")}</tbody>
+    </table></div>
+    <h3 style="margin-top:16px">✅ Saham yang boleh masuk hari ini</h3>
+    <p class="mini">Kriteria lolos (semua harus terpenuhi): verdict BULLISH, skor ≥65, RSI 40-65 (tidak overbought), harga di atas MA20 dan MA50, MACD histogram positif, dan % harian tidak negatif. Diurutkan dari skor tertinggi.</p>
+    ${bolehMasuk.length ? `<div class="tablewrap"><table>
+      <thead><tr><th>Kode</th><th>Skor</th><th>RSI</th><th>Entry</th><th>Stop loss</th><th>Target 1</th><th>Target 2</th></tr></thead>
+      <tbody>${bolehMasuk.map(({code,a})=>`<tr>
+        <td><b>${code}</b></td><td><b>${a.score}</b></td><td>${a.rsi.toFixed(1)}</td>
+        <td>${a.entry}</td><td>${fmtRp(a.stopLoss)}</td><td>${fmtRp(a.target1)}</td><td>${fmtRp(a.target2)}</td>
+      </tr>`).join("")}</tbody>
+    </table></div>` : `<p><b>Hari ini tidak ada saham yang lolos kriteria masuk — semua WNS/Hindari.</b> Jangan paksa masuk; tunggu sampai ada saham yang memenuhi semua kriteria di atas.</p>`}
+    <h3 style="margin-top:16px">⚡ Cocok untuk scalping</h3>
+    <p class="mini">Kriteria lolos: range harian (high-low)/prev close minimal 1,5%, likuiditas tinggi (volume ≥5 jt lembar dan turnover ≥Rp5 miliar), RSI 45-65, MACD positif, harga di atas MA20. Skor scalping 0-100: range +30, likuiditas +25, RSI +20, MACD +15, di atas MA20 +10. Scalping = trading cepat dalam sehari: pakai stop loss ketat, jangan tahan lama, dan jangan kejar harga.</p>
+    ${scalpers.length ? `<div class="tablewrap"><table>
+      <thead><tr><th>Kode</th><th>Range harian</th><th>Volume</th><th>RSI</th><th>Skor scalping</th><th>Catatan</th></tr></thead>
+      <tbody>${scalpers.map(({code,a,scalp})=>`<tr>
+        <td><b>${code}</b></td>
+        <td>${scalp.rangePct==null?"—":scalp.rangePct.toFixed(1)+"%"}</td>
+        <td>${fmtVol(scalp.volume)}<br><span class="muted">turnover ${fmtTurn(scalp.turnover)}</span></td>
+        <td>${a.rsi==null?"—":a.rsi.toFixed(1)}</td>
+        <td><b>${scalp.score}</b></td>
+        <td style="min-width:260px">${scalp.note}</td>
+      </tr>`).join("")}</tbody>
+    </table></div>` : `<p><b>Hari ini tidak ada saham yang cocok untuk scalping.</b> Range harian terlalu kecil, likuiditas kurang, atau RSI/MACD tidak mendukung — lebih aman tidak scalping hari ini.</p>`}
+    <p class="mini">Klik saham di watchlist untuk melihat alasan detail + rencana entry di panel Analisa AI. Semua analisa di atas rule-based dari data Yahoo Finance (delay ~10-15 menit) — bukan rekomendasi investasi dan bukan prediksi pasti.</p>`;
+  renderWatch();
+}
 function drawChart(canvas, closes){
   const ctx=canvas.getContext("2d"); const W=canvas.width, H=canvas.height;
   ctx.clearRect(0,0,W,H);
-  const vals=closes.filter(v=>v!=null); if(vals.length<2){ ctx.fillStyle="#94a3b8"; ctx.font="16px monospace"; ctx.fillText("Data grafik belum tersedia",20,40); return; }
+  const vals=closes.filter(v=>v!=null); if(vals.length<2){ ctx.fillStyle="#64748b"; ctx.font="16px sans-serif"; ctx.fillText("Data grafik belum tersedia",20,40); return; }
   const min=Math.min(...vals), max=Math.max(...vals), pad=(max-min)*0.08||1;
   const lo=min-pad, hi=max+pad;
-  ctx.strokeStyle="#1e293b"; ctx.beginPath();
+  ctx.strokeStyle="#e5e7eb"; ctx.beginPath();
   for(let i=1;i<5;i++){ const y=H*i/5; ctx.moveTo(0,y); ctx.lineTo(W,y); } ctx.stroke();
-  const up = closes[closes.length-1] >= closes[0];
-  ctx.strokeStyle = up ? "#22c55e" : "#ef4444"; ctx.lineWidth=2; ctx.beginPath();
-  closes.forEach((v,i)=>{ if(v==null) return; const x=i/(closes.length-1)*W; const y=H-(v-lo)/(hi-lo)*H; i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
-  ctx.stroke();
+  const pts=closes.map((v,i)=> v==null ? null : {x:i/(closes.length-1)*W, y:H-(v-lo)/(hi-lo)*H}).filter(p=>p);
+  // Garis oranye (gaya Extej) + gradien oranye muda di bawahnya
+  const grad=ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,"rgba(255,122,26,0.22)"); grad.addColorStop(1,"rgba(255,122,26,0)");
+  ctx.beginPath();
+  pts.forEach((p,i)=>{ i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y); });
+  ctx.strokeStyle="#ff7a1a"; ctx.lineWidth=2; ctx.stroke();
+  ctx.lineTo(pts[pts.length-1].x,H); ctx.lineTo(pts[0].x,H); ctx.closePath();
+  ctx.fillStyle=grad; ctx.fill();
   // garis MA20 (putus-putus, biru)
-  const ma=sma(closes,20); ctx.strokeStyle="#38bdf8"; ctx.setLineDash([5,4]); ctx.beginPath();
+  const ma=sma(closes,20); ctx.strokeStyle="#2563eb"; ctx.setLineDash([5,4]); ctx.beginPath();
   let started=false; ma.forEach((v,i)=>{ if(v==null) return; const x=i/(closes.length-1)*W; const y=H-(v-lo)/(hi-lo)*H; if(!started){ctx.moveTo(x,y);started=true;} else ctx.lineTo(x,y); });
   ctx.stroke(); ctx.setLineDash([]);
 }
@@ -304,6 +788,10 @@ async function openDetail(code, keep=false){
     const rsiVal=rsi(valid);
     const lo=Math.min(...valid), hi=Math.max(...valid);
     const q=prices[code+".JK"];
+    const ai=analyzeStock(code, closes, q);
+    analysis[code]=ai;
+    renderAiPanel(code, ai);
+    renderWatch();
     $("#detailStats").innerHTML = `
       <div><small>Harga terakhir</small><b>${fmtRp(q?.price ?? valid[valid.length-1])}</b></div>
       <div><small>MA20</small><b>${fmtRp(lastMA20)}</b></div>
@@ -313,14 +801,15 @@ async function openDetail(code, keep=false){
       <div><small>Terendah ${selectedRange}</small><b>${fmtRp(lo)}</b></div>
       <div><small>Prev close</small><b>${fmtRp(d.previousClose)}</b></div>
       <div><small>Data</small><b>${valid.length} hari bursa</b></div>`;
-    $("#detailNote").textContent = "Garis hijau/merah: harga penutupan. Garis biru putus-putus: MA20. MA/RSI dihitung dari data Yahoo Finance di browser kamu.";
+    $("#detailNote").textContent = "Garis oranye: harga penutupan. Garis biru putus-putus: MA20. MA/RSI dihitung dari data Yahoo Finance di browser kamu.";
     if(!keep) $("#detail").scrollIntoView({behavior:"smooth"});
-  }catch(e){ $("#detailNote").textContent="Gagal memuat grafik: "+e.message; }
+  }catch(e){ $("#detailNote").textContent="Gagal memuat grafik: "+e.message; renderAiPanel(code, null); }
 }
 
 // ---- Alert ----
 function renderAlerts(){
   $("#alertCount").textContent = alerts.length ? `(${alerts.length})` : "";
+  const sc=$("#alertCountSide"); if(sc) sc.textContent = alerts.length ? `(${alerts.length})` : "";
   const list=$("#alertList"); list.innerHTML="";
   if(!alerts.length){ list.innerHTML='<p class="muted">Belum ada alert. Buat alert harga atau % harian di atas.</p>'; }
   alerts.forEach((a,i)=>{
