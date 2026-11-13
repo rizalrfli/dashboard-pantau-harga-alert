@@ -37,6 +37,27 @@ import BaseLayout from "../layouts/BaseLayout.astro";
       <div id="aiSummary" class="panel ai-summary"><p class="muted">Belum dianalisa. Tekan "Analisa Semua Saham" untuk menganalisa semua saham di watchlist.</p></div>
       <div id="aiPanel" class="ai-panel hidden"></div>
 
+      <section class="panel" id="scan911Section" style="margin-top:16px">
+        <h2 style="margin-bottom:8px">Analisa Semua Saham IDX (911)</h2>
+        <p class="muted">Scan seluruh 911 saham IDX dengan analisa AI yang sama seperti watchlist (skor 0–100, verdict BULLISH/NETRAL/BEARISH, saran Masuk/Tunggu/Wait and See/Hindari, plus daftar scalping) — bukan cuma 8 saham watchlist. Daftar "boleh masuk" dan "scalping" di bawah ini dihitung dari 911 saham, terpisah dari daftar watchlist di atas.</p>
+        <p class="muted"><b>Batasan yang jujur:</b> scan penuh butuh beberapa menit karena Yahoo membatasi kecepatan; data Yahoo Finance delay ~10–15 menit; volume hari ini masih sebagian di tengah sesi bursa — paling akurat setelah market close. Saham yang gagal dimuat tidak diberi skor karangan: jumlahnya ditampilkan dan bisa dipindai ulang.</p>
+        <div class="toolbar">
+          <button id="btnScan911" class="primary">Mulai Scan 911 Saham</button>
+          <button id="btnStop911" disabled>Stop</button>
+          <button id="btnRetry911" class="hidden">Coba lagi yang gagal</button>
+        </div>
+        <div id="scan911Progress" class="hidden">
+          <div class="row"><b id="scan911Status">Memindai…</b><span class="muted" id="scan911Eta"></span></div>
+          <div class="progress"><i id="scan911Bar" style="width:0%"></i></div>
+          <div class="mini" id="scan911Detail"></div>
+        </div>
+        <div id="scan911Meta" class="mini" style="margin-top:8px">Belum ada hasil scan 911 saham.</div>
+        <div id="scan911Results" class="ai-summary">
+          <b>Belum dipindai</b>
+          <p class="muted">Tekan "Mulai Scan 911 Saham" — analisa memindai 911 saham IDX dalam batch kecil, hasilnya muncul bertahap dari skor tertinggi. Hasilnya disimpan untuk hari ini, jadi kunjungan berikutnya langsung tampil tanpa scan ulang.</p>
+        </div>
+      </section>
+
       <footer>Data dari Yahoo Finance, bisa delay ~15 menit. Bukan rekomendasi investasi — selalu cek lagi sebelum membeli atau menjual saham.</footer>
     
 </BaseLayout>
@@ -45,6 +66,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 import { fmtRp, fmtPct, analyzeStock, analyzeScalping, fmtVol, fmtTurn, verdictBadge, suggestionBadge } from "../lib/ai.js";
 import { stockLogoHTML } from "../lib/logos.js";
 import { renderAiPanel } from "../lib/analysisPanel.js";
+import { IDX_TICKERS } from "../lib/tickers.js";
 
 const LS = { watch:"idx_watchlist" };
 const $ = s => document.querySelector(s);
@@ -188,6 +210,232 @@ async function openDetailAI(code){
     el.scrollIntoView({behavior:"smooth"});
   }catch(e){ el.innerHTML="<p class='muted'>Gagal memuat analisa "+code+": "+e.message+"</p>"; }
 }
+// ---- Scan 911 saham: analisa AI untuk semua saham IDX ----
+// Pola yang sama seperti Whale Detector (src/pages/whale.astro):
+// batch 5 paralel, jeda 150ms antar batch, retry sekali per ticker,
+// Stop kapan saja, hasil disimpan per hari perdagangan (localStorage)
+// supaya kunjungan berikutnya langsung tampil. Satu ticker yang gagal
+// dimuat dicatat sebagai "terlewat" dan TIDAK diberi skor karangan.
+// Data chart diambil dari /api/chart (range 3mo — butuh 50+ hari untuk
+// MA50/MACD); data harian (dayHigh/dayLow/volume) diambil dari /api/quote
+// per batch karena /api/chart tidak mengembalikan high/low harian —
+// tanpa itu kriteria scalping (range harian, volume, turnover) tidak
+// bisa dihitung. Bila /api/quote gagal, fallback ke data chart (harga
+// terakhir + volume terakhir); range harian jadi tidak tersedia sehingga
+// saham itu otomatis tidak lolos scalping — tidak pernah dikarang.
+const SCAN911 = { batch: 5, delayMs: 150, retryMs: 700, cacheKey: "screener_scan911_v1" };
+let scan911Results = [];   // {code, a, scalp} — a = hasil analyzeStock, scalp = analyzeScalping
+let scan911Skipped = [];   // kode yang gagal dimuat (tanpa skor)
+let scan911Scanning = false, scan911Stop = false;
+let scan911StartedAt = null, scan911Done = 0, scan911Total = 0;
+
+function scan911TodayKey(){ return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }); }
+function loadScan911Cache(){
+  try{
+    const c = JSON.parse(localStorage.getItem(SCAN911.cacheKey));
+    if(c && c.date === scan911TodayKey() && Array.isArray(c.results)) return c;
+  }catch(e){}
+  return null;
+}
+// Cache disimpan ringkas (tanpa reasons/riskNote — panel detail per saham
+// menghitung ulang dari data segar saat baris diklik) supaya 911 hasil
+// muat di localStorage.
+function saveScan911Cache(){
+  try{
+    localStorage.setItem(SCAN911.cacheKey, JSON.stringify({
+      date: scan911TodayKey(), scannedAt: new Date().toISOString(),
+      results: scan911Results.map(({code, a, scalp})=>{
+        const {reasons, riskNote, ...rest} = a || {};
+        return { code, a: rest, scalp };
+      }),
+      skipped: scan911Skipped, total: IDX_TICKERS.length
+    }));
+  }catch(e){ /* localStorage penuh: hasil tetap tampil, cuma tidak tersimpan */ }
+}
+function fmtClock911(d){ return d.toLocaleTimeString("id-ID", { timeZone: "Asia/Jakarta", hour: "2-digit", minute: "2-digit" }); }
+
+async function fetchChart911(code){
+  const r = await fetch(`/api/chart?symbol=${encodeURIComponent(code + ".JK")}&range=3mo`);
+  if(!r.ok) throw new Error("HTTP " + r.status);
+  return r.json();
+}
+async function fetchChart911Retry(code){
+  try { return await fetchChart911(code); }
+  catch(e){
+    await new Promise(res => setTimeout(res, SCAN911.retryMs));
+    return fetchChart911(code); // retry sekali; bila masih gagal, caller mencatat skipped
+  }
+}
+async function fetchQuotes911(codes){
+  try{
+    const r = await fetch("/api/quote?symbols=" + codes.map(c => encodeURIComponent(c + ".JK")).join(","));
+    if(!r.ok) return {};
+    const d = await r.json();
+    const map = {};
+    (d.results || []).forEach(q => { map[q.symbol.replace(/\.JK$/, "")] = q; });
+    return map;
+  }catch(e){ return {}; }
+}
+
+// Kriteria "boleh masuk hari ini" — SAMA seperti daftar watchlist di atas.
+function isDailyEntry911(a){
+  return a.verdict === "BULLISH" && a.score >= 65
+    && a.rsi != null && a.rsi >= 40 && a.rsi <= 65
+    && a.ma20 != null && a.ma50 != null && a.price > a.ma20 && a.price > a.ma50
+    && a.macdHist != null && a.macdHist > 0
+    && (a.changePercent ?? 0) >= 0;
+}
+
+function setScan911Progress(){
+  const pct = scan911Total ? Math.round(scan911Done / scan911Total * 100) : 0;
+  $("#scan911Bar").style.width = pct + "%";
+  $("#scan911Status").textContent = scan911Scanning ? `Memindai ${scan911Done}/${scan911Total} saham (${pct}%)` : `Scan selesai: ${scan911Done}/${scan911Total} saham`;
+  const elapsed = scan911StartedAt ? (Date.now() - scan911StartedAt) / 1000 : 0;
+  const rate = elapsed > 0 ? scan911Done / elapsed : 0;
+  const remain = rate > 0 ? Math.max(0, (scan911Total - scan911Done) / rate) : 0;
+  $("#scan911Eta").textContent = scan911Scanning && remain > 0 ? ` • kira-kira ${Math.ceil(remain / 60)} mnt lagi (rata-rata ${rate.toFixed(1)} saham/detik)` : "";
+  $("#scan911Detail").textContent = `${scan911Results.filter(r => r.a.verdict === "BULLISH").length} bullish • ${scan911Results.filter(r => r.a.verdict === "BEARISH").length} bearish • ${scan911Skipped.length} terlewat • berjalan ${Math.round(elapsed)} detik`;
+}
+
+function renderScan911(){
+  const el = $("#scan911Results");
+  const filter = $("#scan911Filter") ? $("#scan911Filter").value : "ALL";
+  const bull = scan911Results.filter(r => r.a.verdict === "BULLISH").length;
+  const bear = scan911Results.filter(r => r.a.verdict === "BEARISH").length;
+  const net = scan911Results.length - bull - bear;
+  const thin = scan911Results.filter(r => r.a.rsi == null).length; // data <20 hari -> WNS (skor 50, bukan karangan: itu fallback resmi ai.js)
+  const best = scan911Results[0];
+  const cache = loadScan911Cache();
+  const when = cache ? "Hasil scan terakhir " + fmtClock911(new Date(cache.scannedAt)) + " WIB (data hari ini)" : "";
+  $("#scan911Meta").textContent = (scan911Results.length
+    ? `${scan911Results.length} saham berhasil dianalisa • ${bull} bullish • ${net} netral • ${bear} bearish • ${scan911Skipped.length} terlewat (tanpa data / dibatasi Yahoo)${thin ? ` • ${thin} saham data kurang dari 20 hari (otomatis WNS)` : ""}`
+    : "Belum ada hasil scan 911 saham.")
+    + (when ? " • " + when : "") + (scan911Scanning ? " • Scan masih berjalan…" : "");
+  $("#btnRetry911").classList.toggle("hidden", !scan911Skipped.length || scan911Scanning);
+
+  if(!scan911Results.length){
+    el.innerHTML = `<b>${scan911Scanning ? "Memindai…" : "Belum ada hasil"}</b><p class="muted">${scan911Scanning ? "Hasil muncul bertahap dari skor tertinggi." : "Tekan \"Mulai Scan 911 Saham\" untuk memulai."}</p>`;
+    return;
+  }
+  const filtered = scan911Results.filter(r => filter === "ALL" || r.a.verdict === filter);
+  const bolehMasuk911 = scan911Results.filter(({a}) => isDailyEntry911(a)).sort((x, y) => y.a.score - x.a.score);
+  const scalpers911 = scan911Results.filter(r => r.scalp?.eligible).sort((x, y) => y.scalp.score - x.scalp.score);
+  const shown = filtered.slice(0, 200);
+  el.innerHTML = `
+    <b>Analisa 911 Saham — ${scan911Results.length} saham</b>
+    <p class="muted">${bull} bullish, ${net} netral, ${bear} bearish — paling kuat ${best.code} (skor ${best.a.score}, ${best.a.verdict}, saran: ${best.a.suggestion}). Dari 911 saham, ${bolehMasuk911.length} lolos kriteria masuk hari ini dan ${scalpers911.length} cocok untuk scalping (lihat daftar di bawah). ${scan911Skipped.length ? `<b>${scan911Skipped.length} saham terlewat</b> (gagal dimuat — tidak diberi skor): ${scan911Skipped.slice(0, 20).join(", ")}${scan911Skipped.length > 20 ? "…" : ""} — tekan "Coba lagi yang gagal" untuk memindai ulang hanya saham-saham itu.` : "Tidak ada saham yang terlewat."}</p>
+    <form class="inline" style="margin-bottom:10px">
+      <div><label for="scan911Filter">Tampilkan verdict</label><select id="scan911Filter"><option value="ALL">Semua</option><option value="BULLISH">Bullish saja</option><option value="NETRAL">Netral saja</option><option value="BEARISH">Bearish saja</option></select></div>
+    </form>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Kode</th><th>Harga</th><th>%</th><th>Skor</th><th>Arah</th><th>Saran</th><th>RSI</th></tr></thead>
+      <tbody>${shown.map(({code, a}) => `<tr data-code="${code}">
+        <td><span style="display:flex;gap:8px;align-items:center">${stockLogoHTML(code, 28)}<b>${code}</b></span></td>
+        <td>${fmtRp(a.price)}</td>
+        <td class="${(a.changePercent || 0) >= 0 ? "up" : "down"}">${fmtPct(a.changePercent)}</td>
+        <td><b>${a.score}</b></td>
+        <td>${verdictBadge(a)}</td>
+        <td>${suggestionBadge(a.suggestion)}</td>
+        <td>${a.rsi == null ? "—" : a.rsi.toFixed(1)}</td>
+      </tr>`).join("")}</tbody>
+    </table></div>
+    ${filtered.length > 200 ? `<p class="mini">Menampilkan 200 teratas dari ${filtered.length} — pilih filter verdict untuk mempersempit.</p>` : ""}
+    <h3 style="margin-top:16px">Boleh masuk hari ini — dari 911 saham (${bolehMasuk911.length})</h3>
+    <p class="mini">Kriteria lolos (sama seperti daftar watchlist di atas, tapi dihitung dari semua 911 saham IDX): verdict BULLISH, skor ≥65, RSI 40-65, harga di atas MA20 dan MA50, MACD histogram positif, % harian tidak negatif. Diurutkan dari skor tertinggi.</p>
+    ${bolehMasuk911.length ? `<div class="tablewrap"><table>
+      <thead><tr><th>Kode</th><th>Skor</th><th>RSI</th><th>Entry</th><th>Stop loss</th><th>Target 1</th><th>Target 2</th></tr></thead>
+      <tbody>${bolehMasuk911.map(({code, a}) => `<tr data-code="${code}">
+        <td><span style="display:flex;gap:8px;align-items:center">${stockLogoHTML(code, 28)}<b>${code}</b></span></td><td><b>${a.score}</b></td><td>${a.rsi.toFixed(1)}</td>
+        <td>${a.entry}</td><td>${fmtRp(a.stopLoss)}</td><td>${fmtRp(a.target1)}</td><td>${fmtRp(a.target2)}</td>
+      </tr>`).join("")}</tbody>
+    </table></div>` : `<p><b>Dari 911 saham, hari ini tidak ada yang lolos kriteria masuk.</b> Jangan paksa masuk; tunggu sampai ada saham yang memenuhi semua kriteria di atas.</p>`}
+    <h3 style="margin-top:16px">Cocok untuk scalping — dari 911 saham (${scalpers911.length})</h3>
+    <p class="mini">Kriteria lolos (sama seperti daftar watchlist di atas): range harian minimal 1,5%, volume ≥5 jt lembar dan turnover ≥Rp5 miliar, RSI 45-65, MACD positif, harga di atas MA20. Scalping = trading cepat dalam sehari: pakai stop loss ketat, jangan tahan lama, dan jangan kejar harga.</p>
+    ${scalpers911.length ? `<div class="tablewrap"><table>
+      <thead><tr><th>Kode</th><th>Range harian</th><th>Volume</th><th>RSI</th><th>Skor scalping</th><th>Catatan</th></tr></thead>
+      <tbody>${scalpers911.map(({code, a, scalp}) => `<tr data-code="${code}">
+        <td><span style="display:flex;gap:8px;align-items:center">${stockLogoHTML(code, 28)}<b>${code}</b></span></td>
+        <td>${scalp.rangePct == null ? "—" : scalp.rangePct.toFixed(1) + "%"}</td>
+        <td>${fmtVol(scalp.volume)}<br><span class="muted">turnover ${fmtTurn(scalp.turnover)}</span></td>
+        <td>${a.rsi == null ? "—" : a.rsi.toFixed(1)}</td>
+        <td><b>${scalp.score}</b></td>
+        <td style="min-width:260px">${scalp.note}</td>
+      </tr>`).join("")}</tbody>
+    </table></div>` : `<p><b>Dari 911 saham, hari ini tidak ada yang cocok untuk scalping.</b> Range harian terlalu kecil, likuiditas kurang, atau RSI/MACD tidak mendukung — lebih aman tidak scalping hari ini.</p>`}
+    <p class="mini">Klik baris saham untuk melihat alasan detail + rencana entry di panel Analisa AI. Semua analisa di atas rule-based dari data Yahoo Finance (delay ~10-15 menit) — bukan rekomendasi investasi dan bukan prediksi pasti.</p>`;
+  const f = $("#scan911Filter");
+  if(f){ f.value = filter; f.addEventListener("change", renderScan911); }
+  el.querySelectorAll("tbody tr").forEach(tr => {
+    tr.style.cursor = "pointer";
+    tr.addEventListener("click", () => openDetailAI(tr.dataset.code));
+  });
+}
+
+async function runScan911(force, onlyCodes){
+  if(scan911Scanning) return;
+  const codes = (onlyCodes && onlyCodes.length) ? onlyCodes : IDX_TICKERS.map(t => t.code);
+  if(!force && !onlyCodes){
+    const c = loadScan911Cache();
+    if(c){ // hasil hari ini sudah ada: tampilkan, jangan scan ulang otomatis
+      scan911Results = c.results; scan911Skipped = c.skipped || []; scan911Done = c.total;
+      renderScan911();
+      $("#btnScan911").textContent = "Scan Ulang 911 Saham";
+      return;
+    }
+  }
+  const isRetry = !!(onlyCodes && onlyCodes.length);
+  scan911Scanning = true; scan911Stop = false;
+  if(!isRetry){ scan911Results = []; scan911Skipped = []; scan911Done = 0; }
+  else { scan911Skipped = []; } // retry: yang gagal dicatat ulang; yang berhasil ditambahkan ke hasil lama
+  scan911Total = codes.length;
+  scan911StartedAt = Date.now();
+  $("#btnScan911").disabled = true; $("#btnStop911").disabled = false;
+  $("#btnScan911").textContent = "Memindai…";
+  $("#scan911Progress").classList.remove("hidden");
+  renderScan911();
+  for(let i = 0; i < codes.length; i += SCAN911.batch){
+    if(scan911Stop) break;
+    const batch = codes.slice(i, i + SCAN911.batch);
+    const quotesP = fetchQuotes911(batch); // 1 panggilan /api/quote untuk 5 kode sekaligus
+    const settled = await Promise.all(batch.map(async code => {
+      try{
+        const d = await fetchChart911Retry(code);
+        const closes = (d.closes || []).filter(v => v != null);
+        if(!closes.length) return { ok: false, code }; // tidak ada data: terlewat, tanpa skor
+        const quotes = await quotesP;
+        const q = quotes[code] || null;
+        const lastClose = closes[closes.length - 1];
+        const lastVol = (d.volumes || []).filter(v => v != null).pop() ?? null;
+        const quote = q || { price: lastClose, previousClose: d.previousClose ?? null,
+          changePercent: (d.previousClose && d.previousClose !== 0) ? (lastClose - d.previousClose) / d.previousClose * 100 : null,
+          volume: lastVol, dayHigh: null, dayLow: null };
+        const a = analyzeStock(code, d.closes || [], quote);
+        const scalp = analyzeScalping(code, d.volumes || [], quote, a);
+        return { ok: true, code, a, scalp };
+      }catch(e){ return { ok: false, code }; }
+    }));
+    for(const r of settled){
+      if(r.ok){
+        const ix = scan911Results.findIndex(x => x.code === r.code);
+        if(ix >= 0) scan911Results[ix] = r; else scan911Results.push(r);
+      } else scan911Skipped.push(r.code);
+      scan911Done++;
+    }
+    scan911Results.sort((x, y) => y.a.score - x.a.score);
+    setScan911Progress();
+    renderScan911();
+    if(i + SCAN911.batch < codes.length && !scan911Stop){
+      await new Promise(res => setTimeout(res, SCAN911.delayMs));
+    }
+  }
+  scan911Scanning = false;
+  $("#btnScan911").disabled = false; $("#btnStop911").disabled = true;
+  $("#btnScan911").textContent = "Scan Ulang 911 Saham";
+  setScan911Progress();
+  renderScan911();
+  saveScan911Cache();
+}
+
 $("#btnAnalyzeAll").addEventListener("click", analyzeAll);
 $("#btnRefresh").addEventListener("click", async ()=>{ await refreshQuotes(); if(Object.keys(analysis).length) analyzeAll(); });
 $("#btnNotif").addEventListener("click", async ()=>{
@@ -204,6 +452,16 @@ $("#topSearch").addEventListener("input", e=>{
 
 
 
+
+$("#btnScan911").addEventListener("click", ()=>runScan911(true));
+$("#btnStop911").addEventListener("click", ()=>{ scan911Stop = true; $("#btnStop911").disabled = true; $("#scan911Status").textContent = "Menghentikan scan…"; });
+$("#btnRetry911").addEventListener("click", ()=>{ if(scan911Skipped.length) runScan911(true, [...scan911Skipped]); });
+
+// Muat hasil scan 911 hari ini bila ada; kalau belum ada, tampilkan empty state.
+(function initScan911(){
+  const c = loadScan911Cache();
+  if(c){ scan911Results = c.results; scan911Skipped = c.skipped || []; scan911Done = c.total; renderScan911(); $("#btnScan911").textContent = "Scan Ulang 911 Saham"; }
+})();
 
 (async ()=>{ await refreshQuotes(); if(watch.length) analyzeAll(); })();
 setInterval(async ()=>{ await refreshQuotes(); }, 60000);
