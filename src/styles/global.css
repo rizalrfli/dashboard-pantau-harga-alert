@@ -247,8 +247,11 @@
 /* ---- Berita (news.html) ---- */
 .chip.active{background:var(--action);color:#fff;border-color:var(--action)}
 .news-list{display:grid;gap:12px}
-.news-card{cursor:default}
+.news-card{cursor:default;position:relative;padding-right:52px}
 .news-card:hover{transform:none}
+.news-hide{position:absolute;top:10px;right:10px;width:32px;height:32px;min-height:32px;padding:0;display:flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--muted);font-size:13px;line-height:1}
+.news-hide:hover{border-color:var(--text);color:var(--text)}
+@media(max-width:860px){.news-hide{width:44px;height:44px;min-height:44px}}
 .news-title{display:block;font-size:17px;font-weight:600;line-height:1.4;color:var(--text);text-decoration:none}
 .news-title:hover{color:var(--action);text-decoration:underline}
 .news-meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}

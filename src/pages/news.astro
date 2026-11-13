@@ -36,6 +36,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 
       <div class="toolbar">
         <button id="btnNewsRefresh" class="primary">Refresh berita</button>
+        <button id="btnShowHidden" class="hidden" type="button">Tampilkan yang disembunyikan (<span id="hiddenCount">0</span>)</button>
         <span class="mini" id="newsMeta">Memuat berita…</span>
       </div>
 
@@ -68,6 +69,33 @@ let items = [];
 let activeTopic = "Semua";
 let searchTerm = "";
 let loading = false;
+
+// ---- Sembunyikan berita sendiri ----
+// Tombol X di tiap kartu menyimpan link artikel ke localStorage, jadi
+// artikel itu tetap tersembunyi di kunjungan berikutnya. Tombol
+// "Tampilkan yang disembunyikan" mengembalikan semuanya.
+const HIDDEN_KEY = "screener_hidden_news";
+let hiddenLinks = new Set();
+function loadHidden(){
+  try{
+    const v = JSON.parse(localStorage.getItem(HIDDEN_KEY));
+    if (Array.isArray(v)) hiddenLinks = new Set(v.filter(x => typeof x === "string"));
+  }catch(e){ hiddenLinks = new Set(); }
+}
+function saveHidden(){
+  try{ localStorage.setItem(HIDDEN_KEY, JSON.stringify([...hiddenLinks])); }catch(e){}
+}
+function hideArticle(link){
+  hiddenLinks.add(link);
+  saveHidden();
+  renderList();
+}
+function showHidden(){
+  hiddenLinks.clear();
+  saveHidden();
+  renderList();
+}
+loadHidden();
 
 function loadWatch(){
   try{
@@ -109,6 +137,7 @@ function sentimentBadge(s){
 
 function filtered(){
   return items.filter(it => {
+    if(hiddenLinks.has(it.link)) return false;
     if(activeTopic !== "Semua" && !(it.topics || []).includes(activeTopic)) return false;
     if(searchTerm){
       const hay = ((it.title || "") + " " + (it.source || "")).toLowerCase();
@@ -116,6 +145,10 @@ function filtered(){
     }
     return true;
   });
+}
+
+function visibleCount(){
+  return items.filter(it => !hiddenLinks.has(it.link)).length;
 }
 
 function renderChips(watch){
@@ -131,21 +164,34 @@ function renderChips(watch){
 function renderList(){
   const el = $("#newsList");
   const list = filtered();
-  const sources = new Set(items.map(i=>i.source)).size;
-  $("#sumCount").textContent = items.length ? items.length + " berita" : "0 berita";
-  $("#sumCountSub").textContent = list.length !== items.length ? `Menampilkan ${list.length} dari ${items.length} (filter aktif)` : "Maksimal 30 berita terbaru";
+  const visible = visibleCount();
+  const sources = new Set(items.filter(i=>!hiddenLinks.has(i.link)).map(i=>i.source)).size;
+  $("#sumCount").textContent = visible ? visible + " berita" : "0 berita";
+  $("#sumCountSub").textContent = list.length !== visible ? `Menampilkan ${list.length} dari ${visible} (filter aktif)` : "Maksimal 30 berita terbaru";
   $("#sumSources").textContent = sources ? sources + " media" : "—";
-  if(items.length){
-    const newest = items[0];
+  if(visible){
+    const newest = items.find(i=>!hiddenLinks.has(i.link));
     $("#sumLatest").textContent = relTime(newest.publishedAt);
     $("#sumLatestSub").textContent = newest.source || "";
   } else {
     $("#sumLatest").textContent = "—";
     $("#sumLatestSub").textContent = "—";
   }
+  // Tombol "Tampilkan yang disembunyikan" hanya muncul bila ada yang disembunyikan.
+  const btnHidden = $("#btnShowHidden");
+  if(hiddenLinks.size){
+    $("#hiddenCount").textContent = hiddenLinks.size;
+    btnHidden.classList.remove("hidden");
+  } else {
+    btnHidden.classList.add("hidden");
+  }
 
   if(!items.length){
     el.innerHTML = `<div class="panel"><b>Belum ada berita</b><p class="muted">Gagal memuat dari Google News, atau tidak ada berita untuk kueri saat ini. Coba tekan "Refresh berita" — bila tetap kosong, feed Google News mungkin sedang membatasi permintaan.</p></div>`;
+    return;
+  }
+  if(!visible){
+    el.innerHTML = `<div class="panel"><b>Semua berita disembunyikan</b><p class="muted">Kamu menyembunyikan semua berita yang dimuat. Tekan "Tampilkan yang disembunyikan" di atas untuk mengembalikannya.</p></div>`;
     return;
   }
   if(!list.length){
@@ -154,6 +200,7 @@ function renderList(){
   }
   el.innerHTML = list.map(it => `
     <article class="card news-card">
+      <button type="button" class="news-hide" data-link="${esc(it.link)}" aria-label="Sembunyikan berita ini" title="Sembunyikan">✕</button>
       <a class="news-title" href="${esc(it.link)}" target="_blank" rel="noopener noreferrer">${esc(it.title)}</a>
       <div class="news-meta">
         <span>${esc(it.source)}</span><span aria-hidden="true">•</span><span>${relTime(it.publishedAt)}</span>
@@ -204,6 +251,12 @@ async function loadNews(){
 }
 
 $("#btnNewsRefresh").addEventListener("click", loadNews);
+$("#btnShowHidden").addEventListener("click", showHidden);
+// Delegasi klik tombol X di kartu (kartu di-render ulang tiap renderList).
+$("#newsList").addEventListener("click", e=>{
+  const btn = e.target.closest(".news-hide");
+  if(btn && btn.dataset.link) hideArticle(btn.dataset.link);
+});
 const refreshBtn = $("#btnRefresh");
 if(refreshBtn) refreshBtn.addEventListener("click", loadNews);
 $("#newsSearch").addEventListener("input", e=>{ searchTerm = e.target.value.trim().toLowerCase(); renderList(); });

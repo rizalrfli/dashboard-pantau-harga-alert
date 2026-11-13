@@ -14,6 +14,12 @@ const CACHE_TTL_MS = 10 * 60 * 1000; // cache 10 menit di memori function
 const MAX_ITEMS = 30;
 const MAX_TICKER_FEEDS = 4;
 
+// Artikel yang diminta dihapus user — tidak pernah ditampilkan lagi.
+// Tambah link lengkap artikel lain di sini bila perlu disembunyikan juga.
+const BLOCKED_LINKS = [
+  'https://news.google.com/rss/articles/CBMirgFBVV95cUxNTnAwTTFpN1Q1UUtjemZPSTJ3Q3gwdFJiYndhZjFKMkFORTJuNTFEb0lDQnNVeENrbHFoZkdHTlgwWVFOX2FXNkoxeHJEMDdTR1IyQ01peHBiVW5YdjZrSk1fRDd4eFRFZGF0SXBRTmRDR2o4Q1daV1NwQVNZdmFuOGprNVI0amN0OVFOUXY4WmZ1UHZUVUhaNnZ3WmtqcVRrOHhOb3BDZlk1eTRrdWfSAaYBQVVfeXFMUDBGOWY0cEk0ejZJZEVFdmZuZk1DUElRNjRMOGNMM0NXUXJvTTVsMENtQ3FTWXBVdm1rQk9oT3REaDBBUm03cmpxejJZVDZGYzFhUldHY01sWmIwQTdGMEdNU1FxMXRuNjdpTzNGZHBLTUhMNFVXbzIxUVhPTmNNVWpSMXVoZDJYN2dscXJ5X3dLTUNrTk1vSTRoWEZITW80d2lFbDB6dw?oc=5', // "Ini 10 Saham dengan Bobot Terbesar di IHSG Usai 300 Saham HSC Dikeluarkan" — kontan.co.id
+];
+
 // Kueri umum — pasar Indonesia, bukan satu saham.
 const BASE_QUERIES = [
   { q: 'IHSG', topic: 'IHSG & Pasar' },
@@ -165,6 +171,9 @@ module.exports = async (req, res) => {
       continue;
     }
     for (const it of s.value) {
+      // Lewati artikel yang diblokir sebelum dedupe/cap, supaya feed
+      // tetap berisi sampai 30 berita.
+      if (BLOCKED_LINKS.includes(it.link)) continue;
       const prev = byLink.get(it.link);
       if (prev) {
         for (const t of it.topics) if (!prev.topics.includes(t)) prev.topics.push(t);
