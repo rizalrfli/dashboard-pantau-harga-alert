@@ -47,6 +47,11 @@
   body.menu-open .menu-btn span:nth-child(2){opacity:0}
   body.menu-open .menu-btn span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
   .menu-note{display:none}
+  /* ---- Navigasi bawah (HP): tersembunyi di desktop ---- */
+  .bottom-nav{display:none}
+  /* Nilai sel tabel multi-baris (mis. volume + turnover): di mode kartu
+     dibungkus span ini supaya <br> di dalamnya tetap bekerja. */
+  .tablewrap td[data-label] .cell-val{display:block;text-align:right;min-width:0}
   /* ---- Area utama ---- */
   .main{flex:1;min-width:0}
   .topbar{position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--line);z-index:5}
@@ -90,7 +95,7 @@
   .tabs{display:flex;gap:6px;margin:6px 0 var(--s-4)}
   .tabs button.active{background:var(--action);color:#fff;border-color:var(--action)}
   .grid{display:grid;grid-template-columns:1fr;gap:var(--s-3)}
-  @media(min-width:760px){.grid{grid-template-columns:1fr 1fr}}
+  @media(min-width:768px){.grid{grid-template-columns:1fr 1fr}}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);padding:var(--s-4);cursor:pointer;box-shadow:var(--shadow);transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease}
   .card:hover{transform:translateY(-2px);box-shadow:var(--shadow-lift);border-color:var(--line-strong)}
   .card .sym{font-size:18px;font-weight:600}
@@ -106,7 +111,7 @@
   .hidden{display:none!important}
   canvas{display:block;width:100%;max-width:100%;height:220px;background:#fff;border:1px solid var(--line);border-radius:var(--r-md)}
   .stat{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px}
-  @media(min-width:760px){.stat{grid-template-columns:repeat(4,1fr)}}
+  @media(min-width:768px){.stat{grid-template-columns:repeat(4,1fr)}}
   .stat div{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);padding:8px}
   .stat small{color:var(--muted);display:block;font-size:13px}
   .stat b{font-variant-numeric:tabular-nums}
@@ -166,10 +171,23 @@
     #topSearch{font-size:16px}
     .user-chip{display:none}
     #btnLogout{display:none}
-    .wrap{padding-left:16px;padding-right:16px}
+    .wrap{padding-left:16px;padding-right:16px;padding-bottom:calc(16px + 64px + env(safe-area-inset-bottom))}
+    /* Pengaman: halaman tidak boleh bergeser ke samping di HP (hanya tabel
+       di dalam .tablewrap yang boleh di-scroll horizontal). overflow-x:clip
+       — bukan hidden — supaya position:sticky tetap bekerja. */
+    html,body{overflow-x:clip}
     h1{font-size:24px}
     .sum-value{font-size:24px}
-    .summary{grid-template-columns:1fr}
+    /* Ringkasan 2 kolom di HP (kartu terakhir yang jumlahnya ganjil
+       membentang penuh, mis. 1 kartu IHSG atau kartu ke-3 dari 3 kartu). */
+    .summary{grid-template-columns:repeat(2,1fr);gap:12px}
+    .summary .sum-card:last-child:nth-child(odd){grid-column:1/-1}
+    /* Navigasi bawah: 5 halaman utama, 60px + safe-area, aktif = oranye */
+    .bottom-nav{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--panel);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+    .bottom-nav a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:60px;padding:8px 2px 6px;color:var(--muted);text-decoration:none;font-size:12px;font-weight:500}
+    .bottom-nav a svg{width:22px;height:22px;flex-shrink:0}
+    .bottom-nav a.active{color:var(--action)}
+    .bottom-nav a:active{background:var(--surface)}
     button,input,select{font-size:16px;min-height:44px}
     .tabs button{flex:1;padding:9px 4px;font-size:14px}
     .toolbar button{flex:1 1 auto}
@@ -190,6 +208,31 @@
     .tablewrap thead th:first-child{background:var(--panel)}
     footer{padding-bottom:env(safe-area-inset-bottom)}
   }
+  @media(max-width:640px){
+    /* ---- Tabel jadi kartu (kecuali .tablewrap--scroll, mis. Whale yang
+       memang lebar 9 kolom dan tetap digeser + kolom pertama menempel) ----
+       Syarat: tiap <td> membawa data-label="Nama Kolom" (ditambahkan di
+       template JS halaman). Nilai tetap lengkap & bisa diketuk — tidak
+       ada kolom yang disembunyikan. */
+    .tablewrap:not(.tablewrap--scroll){overflow-x:visible}
+    .tablewrap:not(.tablewrap--scroll)::before{display:none}
+    .tablewrap:not(.tablewrap--scroll) table{min-width:0}
+    .tablewrap:not(.tablewrap--scroll) thead{display:none}
+    .tablewrap:not(.tablewrap--scroll) table,
+    .tablewrap:not(.tablewrap--scroll) tbody,
+    .tablewrap:not(.tablewrap--scroll) tr{display:block;width:100%}
+    .tablewrap:not(.tablewrap--scroll) tr{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-md);padding:8px 12px;margin-bottom:10px;box-shadow:var(--shadow)}
+    .tablewrap:not(.tablewrap--scroll) td{display:block;border-bottom:1px solid var(--line);padding:8px 0;text-align:left;min-width:0 !important}
+    .tablewrap:not(.tablewrap--scroll) td:last-child{border-bottom:none}
+    .tablewrap:not(.tablewrap--scroll) td[data-label]{display:flex;justify-content:space-between;align-items:baseline;gap:12px;text-align:right}
+    .tablewrap:not(.tablewrap--scroll) td[data-label]::before{content:attr(data-label);color:var(--muted);font-size:13px;font-weight:500;text-align:left;flex-shrink:0}
+    .tablewrap:not(.tablewrap--scroll) td.cell-action{display:flex;justify-content:flex-end;border-bottom:none;padding:4px 0}
+    .tablewrap:not(.tablewrap--scroll) th:first-child,
+    .tablewrap:not(.tablewrap--scroll) td:first-child{position:static;box-shadow:none}
+    /* ---- Panel detail saham jadi bottom sheet di HP ---- */
+    #detail:not(.hidden){position:fixed;left:0;right:0;bottom:0;z-index:40;max-height:88vh;max-height:88dvh;overflow-y:auto;border-radius:16px 16px 0 0;box-shadow:0 -8px 30px rgba(16,24,40,.18);margin:0;padding-bottom:calc(16px + env(safe-area-inset-bottom))}
+    #detail:not(.hidden)::before{content:"";display:block;width:40px;height:4px;border-radius:999px;background:var(--line-strong);margin:0 auto 8px}
+  }
   @media(max-width:480px){
     h1{font-size:22px}
     .wrap{padding-left:12px;padding-right:12px}
@@ -197,9 +240,23 @@
     .toolbar button{flex:1 1 100%}
     form.inline>div{flex:1 1 100%}
     form.inline button{flex:1 1 100%}
-    .tabs button{font-size:13px}
+    .tabs button{font-size:14px;padding:9px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .ai-plan td:first-child{width:88px}
     .summary{gap:12px}
+  }
+  @media(max-width:360px){
+    /* HP kecil (320-360px): padding & huruf mengecil supaya tidak ada
+       yang terpotong, ringkasan tetap 2 kolom. */
+    .wrap{padding-left:10px;padding-right:10px}
+    .topbar-inner{padding:10px 12px}
+    h1{font-size:21px}
+    h2{font-size:18px}
+    .sum-card{padding:12px}
+    .sum-value{font-size:22px}
+    .sum-sub{font-size:13px}
+    .card{padding:12px}
+    .panel{padding:12px}
+    .price{font-size:20px}
   }
 /* ---- Whale Detector: progress pindai ---- */
   .progress{height:10px;background:var(--line);border-radius:999px;overflow:hidden;margin:8px 0}

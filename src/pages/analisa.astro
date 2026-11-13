@@ -166,15 +166,15 @@ async function analyzeAll(){
     <div class="tablewrap"><table>
       <thead><tr><th>Kode</th><th>Harga</th><th>%</th><th>RSI</th><th>MA20 / MA50</th><th>MACD</th><th>Skor</th><th>Arah</th><th>Saran</th></tr></thead>
       <tbody>${rows.map(({code,a})=>`<tr>
-        <td><span style="display:flex;gap:8px;align-items:center">${stockLogoHTML(code, 28)}<b>${code}</b></span></td>
-        <td>${fmtRp(a.price)}</td>
-        <td class="${(a.changePercent||0)>=0?"up":"down"}">${fmtPct(a.changePercent)}</td>
-        <td>${a.rsi==null?"—":a.rsi.toFixed(1)}</td>
-        <td>${fmtRp(a.ma20)} / ${fmtRp(a.ma50)}</td>
-        <td>${a.macdHist==null?"—":(a.macdHist>=0?"+":"")+Math.round(a.macdHist)}</td>
-        <td><b>${a.score}</b></td>
-        <td>${verdictBadge(a)}</td>
-        <td>${suggestionBadge(a.suggestion)}</td>
+        <td data-label="Kode"><span style="display:flex;gap:8px;align-items:center">${stockLogoHTML(code, 28)}<b>${code}</b></span></td>
+        <td data-label="Harga">${fmtRp(a.price)}</td>
+        <td data-label="%" class="${(a.changePercent||0)>=0?"up":"down"}">${fmtPct(a.changePercent)}</td>
+        <td data-label="RSI">${a.rsi==null?"—":a.rsi.toFixed(1)}</td>
+        <td data-label="MA20 / MA50">${fmtRp(a.ma20)} / ${fmtRp(a.ma50)}</td>
+        <td data-label="MACD">${a.macdHist==null?"—":(a.macdHist>=0?"+":"")+Math.round(a.macdHist)}</td>
+        <td data-label="Skor"><b>${a.score}</b></td>
+        <td data-label="Arah">${verdictBadge(a)}</td>
+        <td data-label="Saran">${suggestionBadge(a.suggestion)}</td>
       </tr>`).join("")}</tbody>
     </table></div>
     <h3 style="margin-top:16px">Saham yang boleh masuk hari ini</h3>
@@ -182,8 +182,8 @@ async function analyzeAll(){
     ${bolehMasuk.length ? `<div class="tablewrap"><table>
       <thead><tr><th>Kode</th><th>Skor</th><th>RSI</th><th>Entry</th><th>Stop loss</th><th>Target 1</th><th>Target 2</th></tr></thead>
       <tbody>${bolehMasuk.map(({code,a})=>`<tr>
-        <td><span style="display:flex;gap:8px;align-items:center">${stockLogoHTML(code, 28)}<b>${code}</b></span></td><td><b>${a.score}</b></td><td>${a.rsi.toFixed(1)}</td>
-        <td>${a.entry}</td><td>${fmtRp(a.stopLoss)}</td><td>${fmtRp(a.target1)}</td><td>${fmtRp(a.target2)}</td>
+        <td data-label="Kode"><span style="display:flex;gap:8px;align-items:center">${stockLogoHTML(code, 28)}<b>${code}</b></span></td><td data-label="Skor"><b>${a.score}</b></td><td data-label="RSI">${a.rsi.toFixed(1)}</td>
+        <td data-label="Entry">${a.entry}</td><td data-label="Stop loss">${fmtRp(a.stopLoss)}</td><td data-label="Target 1">${fmtRp(a.target1)}</td><td data-label="Target 2">${fmtRp(a.target2)}</td>
       </tr>`).join("")}</tbody>
     </table></div>` : `<p><b>Hari ini tidak ada saham yang lolos kriteria masuk — semua WNS/Hindari.</b> Jangan paksa masuk; tunggu sampai ada saham yang memenuhi semua kriteria di atas.</p>`}
     <h3 style="margin-top:16px">Cocok untuk scalping</h3>
@@ -191,12 +191,12 @@ async function analyzeAll(){
     ${scalpers.length ? `<div class="tablewrap"><table>
       <thead><tr><th>Kode</th><th>Range harian</th><th>Volume</th><th>RSI</th><th>Skor scalping</th><th>Catatan</th></tr></thead>
       <tbody>${scalpers.map(({code,a,scalp})=>`<tr>
-        <td><span style="display:flex;gap:8px;align-items:center">${stockLogoHTML(code, 28)}<b>${code}</b></span></td>
-        <td>${scalp.rangePct==null?"—":scalp.rangePct.toFixed(1)+"%"}</td>
-        <td>${fmtVol(scalp.volume)}<br><span class="muted">turnover ${fmtTurn(scalp.turnover)}</span></td>
-        <td>${a.rsi==null?"—":a.rsi.toFixed(1)}</td>
-        <td><b>${scalp.score}</b></td>
-        <td style="min-width:260px">${scalp.note}</td>
+        <td data-label="Kode"><span style="display:flex;gap:8px;align-items:center">${stockLogoHTML(code, 28)}<b>${code}</b></span></td>
+        <td data-label="Range harian">${scalp.rangePct==null?"—":scalp.rangePct.toFixed(1)+"%"}</td>
+        <td data-label="Volume"><span class="cell-val">${fmtVol(scalp.volume)}<br><span class="muted">turnover ${fmtTurn(scalp.turnover)}</span></span></td>
+        <td data-label="RSI">${a.rsi==null?"—":a.rsi.toFixed(1)}</td>
+        <td data-label="Skor scalping"><b>${scalp.score}</b></td>
+        <td data-label="Catatan" style="min-width:260px">${scalp.note}</td>
       </tr>`).join("")}</tbody>
     </table></div>` : `<p><b>Hari ini tidak ada saham yang cocok untuk scalping.</b> Range harian terlalu kecil, likuiditas kurang, atau RSI/MACD tidak mendukung — lebih aman tidak scalping hari ini.</p>`}
     ${swingSectionHTML(swingList, holdList, "watchlist", true)}
@@ -354,13 +354,13 @@ function renderScan911(){
     <div class="tablewrap"><table>
       <thead><tr><th>Kode</th><th>Harga</th><th>%</th><th>Skor</th><th>Arah</th><th>Saran</th><th>RSI</th></tr></thead>
       <tbody>${shown.map(({code, a}) => `<tr data-code="${code}">
-        <td><span style="display:flex;gap:8px;align-items:center">${stockLogoHTML(code, 28)}<b>${code}</b></span></td>
-        <td>${fmtRp(a.price)}</td>
-        <td class="${(a.changePercent || 0) >= 0 ? "up" : "down"}">${fmtPct(a.changePercent)}</td>
-        <td><b>${a.score}</b></td>
-        <td>${verdictBadge(a)}</td>
-        <td>${suggestionBadge(a.suggestion)}</td>
-        <td>${a.rsi == null ? "—" : a.rsi.toFixed(1)}</td>
+        <td data-label="Kode"><span style="display:flex;gap:8px;align-items:center">${stockLogoHTML(code, 28)}<b>${code}</b></span></td>
+        <td data-label="Harga">${fmtRp(a.price)}</td>
+        <td data-label="%" class="${(a.changePercent || 0) >= 0 ? "up" : "down"}">${fmtPct(a.changePercent)}</td>
+        <td data-label="Skor"><b>${a.score}</b></td>
+        <td data-label="Arah">${verdictBadge(a)}</td>
+        <td data-label="Saran">${suggestionBadge(a.suggestion)}</td>
+        <td data-label="RSI">${a.rsi == null ? "—" : a.rsi.toFixed(1)}</td>
       </tr>`).join("")}</tbody>
     </table></div>
     ${filtered.length > 200 ? `<p class="mini">Menampilkan 200 teratas dari ${filtered.length} — pilih filter verdict untuk mempersempit.</p>` : ""}
@@ -369,8 +369,8 @@ function renderScan911(){
     ${bolehMasuk911.length ? `<div class="tablewrap"><table>
       <thead><tr><th>Kode</th><th>Skor</th><th>RSI</th><th>Entry</th><th>Stop loss</th><th>Target 1</th><th>Target 2</th></tr></thead>
       <tbody>${bolehMasuk911.map(({code, a}) => `<tr data-code="${code}">
-        <td><span style="display:flex;gap:8px;align-items:center">${stockLogoHTML(code, 28)}<b>${code}</b></span></td><td><b>${a.score}</b></td><td>${a.rsi.toFixed(1)}</td>
-        <td>${a.entry}</td><td>${fmtRp(a.stopLoss)}</td><td>${fmtRp(a.target1)}</td><td>${fmtRp(a.target2)}</td>
+        <td data-label="Kode"><span style="display:flex;gap:8px;align-items:center">${stockLogoHTML(code, 28)}<b>${code}</b></span></td><td data-label="Skor"><b>${a.score}</b></td><td data-label="RSI">${a.rsi.toFixed(1)}</td>
+        <td data-label="Entry">${a.entry}</td><td data-label="Stop loss">${fmtRp(a.stopLoss)}</td><td data-label="Target 1">${fmtRp(a.target1)}</td><td data-label="Target 2">${fmtRp(a.target2)}</td>
       </tr>`).join("")}</tbody>
     </table></div>` : `<p><b>Dari 911 saham, hari ini tidak ada yang lolos kriteria masuk.</b> Jangan paksa masuk; tunggu sampai ada saham yang memenuhi semua kriteria di atas.</p>`}
     <h3 style="margin-top:16px">Cocok untuk scalping — dari 911 saham (${scalpers911.length})</h3>
@@ -378,12 +378,12 @@ function renderScan911(){
     ${scalpers911.length ? `<div class="tablewrap"><table>
       <thead><tr><th>Kode</th><th>Range harian</th><th>Volume</th><th>RSI</th><th>Skor scalping</th><th>Catatan</th></tr></thead>
       <tbody>${scalpers911.map(({code, a, scalp}) => `<tr data-code="${code}">
-        <td><span style="display:flex;gap:8px;align-items:center">${stockLogoHTML(code, 28)}<b>${code}</b></span></td>
-        <td>${scalp.rangePct == null ? "—" : scalp.rangePct.toFixed(1) + "%"}</td>
-        <td>${fmtVol(scalp.volume)}<br><span class="muted">turnover ${fmtTurn(scalp.turnover)}</span></td>
-        <td>${a.rsi == null ? "—" : a.rsi.toFixed(1)}</td>
-        <td><b>${scalp.score}</b></td>
-        <td style="min-width:260px">${scalp.note}</td>
+        <td data-label="Kode"><span style="display:flex;gap:8px;align-items:center">${stockLogoHTML(code, 28)}<b>${code}</b></span></td>
+        <td data-label="Range harian">${scalp.rangePct == null ? "—" : scalp.rangePct.toFixed(1) + "%"}</td>
+        <td data-label="Volume"><span class="cell-val">${fmtVol(scalp.volume)}<br><span class="muted">turnover ${fmtTurn(scalp.turnover)}</span></span></td>
+        <td data-label="RSI">${a.rsi == null ? "—" : a.rsi.toFixed(1)}</td>
+        <td data-label="Skor scalping"><b>${scalp.score}</b></td>
+        <td data-label="Catatan" style="min-width:260px">${scalp.note}</td>
       </tr>`).join("")}</tbody>
     </table></div>` : `<p><b>Dari 911 saham, hari ini tidak ada yang cocok untuk scalping.</b> Range harian terlalu kecil, likuiditas kurang, atau RSI/MACD tidak mendukung — lebih aman tidak scalping hari ini.</p>`}
     ${swingSectionHTML(swing911, hold911, "dari 911 saham", true)}

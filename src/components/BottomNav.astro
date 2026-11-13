@@ -1,0 +1,36 @@
+---
+// src/components/BottomNav.astro — navigasi bawah khusus HP (≤860px).
+// 5 halaman utama dengan ikon + label, aktif = oranye. Di desktop
+// disembunyikan (display:none di global.css). Hamburger tetap ada untuk
+// item sekunder (Alert, Portofolio, Logout).
+interface Props {
+  active: "watch" | "analisa" | "whale" | "news" | "swing";
+}
+
+const { active } = Astro.props;
+const cls = (n: string) => (active === n ? "active" : undefined);
+const cur = (n: string) => (active === n ? "page" : undefined);
+---
+
+<nav class="bottom-nav" aria-label="Navigasi utama">
+  <a href="index.html" class={cls("watch")} aria-current={cur("watch")}>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+    <span>Watchlist</span>
+  </a>
+  <a href="analisa.html" class={cls("analisa")} aria-current={cur("analisa")}>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15v3M12 10v8M17 6v12"/></svg>
+    <span>Analisa</span>
+  </a>
+  <a href="swing.html" class={cls("swing")} aria-current={cur("swing")}>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg>
+    <span>Swing</span>
+  </a>
+  <a href="news.html" class={cls("news")} aria-current={cur("news")}>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v12H4z"/><path d="M4 16v4h16v-4"/><path d="M8 8h8M8 12h5"/></svg>
+    <span>Berita</span>
+  </a>
+  <a href="whale.html" class={cls("whale")} aria-current={cur("whale")}>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12h4l3-8 4 16 3-8h6"/></svg>
+    <span>Whale</span>
+  </a>
+</nav>

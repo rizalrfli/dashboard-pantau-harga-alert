@@ -9,13 +9,13 @@ import { stockLogoHTML } from "./logos.js";
 
 export function swingSectionHTML(swingList, holdList, scope, showPageLink = false){
   const row = ({code, swing}) => `<tr>
-    <td><span style="display:flex;gap:8px;align-items:center">${stockLogoHTML(code, 28)}<b>${code}</b></span></td>
-    <td><b>${swing.swingScore}</b></td>
-    <td>${fmtRp(swing.price)}</td>
-    <td style="min-width:220px">${swing.entry}</td>
-    <td>${swing.stopLoss == null ? "—" : fmtRp(swing.stopLoss)}</td>
-    <td>${swing.target == null ? "—" : fmtRp(swing.target)}${swing.target2 != null ? `<br><span class="muted">target 2: ${fmtRp(swing.target2)}</span>` : ""}</td>
-    <td style="min-width:260px">${swing.reasons.join(" ")}</td>
+    <td data-label="Kode"><span style="display:flex;gap:8px;align-items:center">${stockLogoHTML(code, 28)}<b>${code}</b></span></td>
+    <td data-label="Skor swing"><b>${swing.swingScore}</b></td>
+    <td data-label="Harga">${fmtRp(swing.price)}</td>
+    <td data-label="Entry" style="min-width:220px">${swing.entry}</td>
+    <td data-label="Stop loss">${swing.stopLoss == null ? "—" : fmtRp(swing.stopLoss)}</td>
+    <td data-label="Target"><span class="cell-val">${swing.target == null ? "—" : fmtRp(swing.target)}${swing.target2 != null ? `<br><span class="muted">target 2: ${fmtRp(swing.target2)}</span>` : ""}</span></td>
+    <td data-label="Alasan" style="min-width:260px">${swing.reasons.join(" ")}</td>
   </tr>`;
   const table = (list) => `<div class="tablewrap"><table>
     <thead><tr><th>Kode</th><th>Skor swing</th><th>Harga</th><th>Entry</th><th>Stop loss</th><th>Target</th><th>Alasan</th></tr></thead>

@@ -162,7 +162,7 @@ function renderResults(){
   el.innerHTML = `
     <b>Hasil Whale Detector — ${filtered.length} saham</b>
     <p class="muted">Diurutkan dari skor Whale tertinggi. Klik baris untuk melihat analisa AI (bull/bear + rencana entry) saham itu. ${filtered.length > 200 ? "Menampilkan 200 teratas — persempit filter untuk melihat sisanya." : ""}</p>
-    <div class="tablewrap"><table>
+    <div class="tablewrap tablewrap--scroll"><table>
       <thead><tr><th>Kode</th><th>Nama</th><th>Harga</th><th>%</th><th>Volume</th><th>Vol / rata-rata</th><th>Turnover</th><th>Skor Whale</th><th>Sinyal</th></tr></thead>
       <tbody>${shown.map(w=>`<tr data-code="${w.code}">
         <td><span style="display:flex;gap:8px;align-items:center">${stockLogoHTML(w.code, 28)}<b>${w.code}</b></span></td>

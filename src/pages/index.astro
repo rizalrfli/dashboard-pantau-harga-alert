@@ -394,9 +394,9 @@ function renderPortfolio(){
     const shares=p.lot*100, cost=shares*p.price, cur=q?shares*q.price:null, pl=cur!=null?cur-cost:null;
     totalVal+=cur||0; totalCost+=cost;
     const tr=document.createElement("tr");
-    tr.innerHTML=`<td><b>${p.code}</b></td><td>${p.lot}</td><td>${fmtRp(p.price)}</td><td>${fmtRp(q?.price)}</td>
-      <td class="${pl==null?"":pl>=0?"up":"down"}">${pl==null?"—":(pl>=0?"+":"−")+fmtRp(Math.abs(pl))+" ("+fmtPct(cost?pl/cost*100:null)+")"}</td>
-      <td><button class="del">✕</button></td>`;
+    tr.innerHTML=`<td data-label="Kode"><b>${p.code}</b></td><td data-label="Lot">${p.lot}</td><td data-label="Beli">${fmtRp(p.price)}</td><td data-label="Terakhir">${fmtRp(q?.price)}</td>
+      <td data-label="P/L" class="${pl==null?"":pl>=0?"up":"down"}">${pl==null?"—":(pl>=0?"+":"−")+fmtRp(Math.abs(pl))+" ("+fmtPct(cost?pl/cost*100:null)+")"}</td>
+      <td class="cell-action"><button class="del">✕</button></td>`;
     tr.querySelector(".del").onclick=()=>{ portfolio.splice(i,1); save(LS.port,portfolio); renderPortfolio(); };
     body.appendChild(tr);
   });

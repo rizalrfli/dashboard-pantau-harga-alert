@@ -5,6 +5,7 @@
 import "../styles/global.css";
 import Sidebar from "../components/Sidebar.astro";
 import Topbar from "../components/Topbar.astro";
+import BottomNav from "../components/BottomNav.astro";
 
 interface Props {
   title: string;
@@ -84,6 +85,7 @@ const {
         </main>
       </div>
     </div>
+    <BottomNav active={active} />
     <script>
       import { initMenu, initLogout } from "../lib/menu.js";
       initMenu();
