@@ -179,7 +179,21 @@ async function refreshAll(){
     data.results.forEach(q=>{ prices[q.symbol]=q; });
     if(data.errors?.length) console.warn("quote errors", data.errors);
     renderIhsg(); renderWatch(); checkAlerts(); renderPortfolio();
-    $("#lastUpdate").textContent = "Terakhir update: " + new Date().toLocaleTimeString("id-ID",{timeZone:"Asia/Jakarta"}) + " WIB";
+    // Jam terakhir update = marketTime terbaru dari Yahoo (bukan jam fetch),
+    // supaya kelihatan data bursanya per jam berapa dan telat berapa menit.
+    const mts = data.results.map(q=>q.marketTime).filter(Boolean).map(t=>new Date(t).getTime()).filter(n=>!isNaN(n));
+    const latest = mts.length ? Math.max(...mts) : null;
+    const now = new Date();
+    const fmtTime = d => d.toLocaleTimeString("id-ID",{timeZone:"Asia/Jakarta", hour:"2-digit", minute:"2-digit"});
+    if(latest){
+      const delayMin = Math.max(0, Math.round((now.getTime()-latest)/60000));
+      const el = $("#lastUpdate");
+      el.textContent = `Data bursa per ${fmtTime(new Date(latest))} WIB • telat ${delayMin} mnt • dicek ${fmtTime(now)} WIB`;
+      el.style.color = delayMin > 15 ? "#f59e0b" : "";
+      el.title = "marketTime terbaru dari Yahoo Finance; delay = jam sekarang minus jam data bursa";
+    } else {
+      $("#lastUpdate").textContent = "Terakhir dicek: " + fmtTime(now) + " WIB (jam data bursa tidak tersedia)";
+    }
   }catch(e){
     const el=$("#globalError"); el.textContent="Gagal memuat harga: "+e.message+". Coba refresh lagi."; el.classList.remove("hidden");
   }finally{ $("#watchLoading").classList.add("hidden"); }
@@ -190,9 +204,11 @@ function renderIhsg(){
   const el = $("#ihsg");
   if(!q){ el.innerHTML='<span class="muted">IHSG tidak tersedia</span>'; return; }
   const cls = (q.changePercent||0)>=0 ? "up":"down";
+  const mt = q.marketTime ? new Date(q.marketTime).toLocaleTimeString("id-ID",{timeZone:"Asia/Jakarta", hour:"2-digit", minute:"2-digit"}) : null;
   el.innerHTML = `<span><b>IHSG</b></span><span><b>${fmtNum(q.price)}</b></span>
     <span class="${cls}">${fmtPct(q.changePercent)} (${q.change!=null?(q.change>=0?"+":"")+Math.round(q.change).toLocaleString("id-ID"):"—"})</span>
-    <span class="muted">Tertinggi ${fmtNum(q.dayHigh)} • Terendah ${fmtNum(q.dayLow)} • Vol ${fmtNum(q.volume)}</span>`;
+    <span class="muted">Tertinggi ${fmtNum(q.dayHigh)} • Terendah ${fmtNum(q.dayLow)} • Vol ${fmtNum(q.volume)}</span>
+    ${mt ? `<span class="muted">Data per ${mt} WIB</span>` : ""}`;
 }
 
 function renderWatch(){
